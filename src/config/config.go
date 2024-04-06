@@ -17,6 +17,7 @@ import (
 )
 
 type Config struct {
+	path     string
 	config   Root
 	metadata toml.MetaData
 }
@@ -45,7 +46,7 @@ func Read(path string) (*Config, error) {
 		return nil, err
 	}
 
-	return &Config{config: config, metadata: meta}, nil
+	return &Config{path: path, config: config, metadata: meta}, nil
 }
 
 func ConfigDir() (string, error) {
@@ -187,6 +188,31 @@ func (c *Config) readPrivateKey(kind string, purpose int) ([]cryptor.PrivateKey,
 		return nil, err
 	}
 	return []cryptor.PrivateKey{privKey}, nil
+}
+
+func (c *Config) SandboxPaths() (ro []string, rw []string, err error) {
+	ro = append(ro, c.path)
+
+	keyPaths := []string{}
+	keyPaths = append(keyPaths, c.config.Keys.Sign["nacl"].Public...)
+	keyPaths = append(keyPaths, c.config.Keys.Sign["nacl"].Private)
+	keyPaths = append(keyPaths, c.config.Keys.Sign["rsa"].Public...)
+	keyPaths = append(keyPaths, c.config.Keys.Sign["rsa"].Private)
+	keyPaths = append(keyPaths, c.config.Keys.Encrypt["nacl"].Public...)
+	keyPaths = append(keyPaths, c.config.Keys.Encrypt["nacl"].Private)
+	keyPaths = append(keyPaths, c.config.Keys.Encrypt["rsa"].Public...)
+	keyPaths = append(keyPaths, c.config.Keys.Encrypt["rsa"].Private)
+
+	for _, path := range keyPaths {
+		realPath, err := expand(path)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		ro = append(ro, realPath)
+	}
+
+	return ro, nil, err
 }
 
 func expand(path string) (string, error) {

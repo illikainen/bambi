@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/illikainen/bambi/src/archive"
@@ -10,6 +11,7 @@ import (
 	"github.com/illikainen/go-cryptor/src/cryptor"
 	"github.com/illikainen/go-utils/src/errorx"
 	"github.com/illikainen/go-utils/src/iofs"
+	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
@@ -46,6 +48,62 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 	conf, err := config.Read(rootOpts.config)
 	if err != nil {
 		return err
+	}
+
+	if sandbox.Compatible() && !sandbox.IsSandboxed() {
+		ro := []string{unsealOpts.Input}
+		rw := []string{}
+
+		confRO, confRW, err := conf.SandboxPaths()
+		if err != nil {
+			return err
+		}
+		ro = append(ro, confRO...)
+		rw = append(rw, confRW...)
+
+		// Required to mount the file in the sandbox.
+		if unsealOpts.Output != "" {
+			f, err := os.Create(unsealOpts.Output)
+			if err != nil {
+				return err
+			}
+
+			err = f.Close()
+			if err != nil {
+				return err
+			}
+
+			rw = append(rw, unsealOpts.Output)
+		}
+
+		// See ^
+		if unsealOpts.Extract != "" {
+			err := os.Mkdir(unsealOpts.Extract, 0700)
+			if err != nil {
+				return err
+			}
+
+			rw = append(rw, unsealOpts.Extract)
+		}
+
+		err = sandbox.Run(sandbox.Options{
+			Args: os.Args,
+			RO:   ro,
+			RW:   rw,
+		})
+		if err != nil {
+			var outErr error
+			if unsealOpts.Output != "" {
+				outErr = os.Remove(unsealOpts.Output)
+			}
+
+			var extErr error
+			if unsealOpts.Extract != "" {
+				extErr = os.RemoveAll(unsealOpts.Extract)
+			}
+
+			return errorx.Join(err, outErr, extErr)
+		}
 	}
 
 	keys, err := conf.ReadKeyrings()

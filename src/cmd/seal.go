@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/illikainen/bambi/src/archive"
@@ -10,6 +11,7 @@ import (
 	"github.com/illikainen/go-cryptor/src/cryptor"
 	"github.com/illikainen/go-utils/src/errorx"
 	"github.com/illikainen/go-utils/src/iofs"
+	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
@@ -54,6 +56,35 @@ func sealRun(_ *cobra.Command, args []string) (err error) {
 	conf, err := config.Read(rootOpts.config)
 	if err != nil {
 		return err
+	}
+
+	if sandbox.Compatible() && !sandbox.IsSandboxed() {
+		ro := []string{}
+		rw := []string{sealOpts.Output}
+
+		confRO, confRW, err := conf.SandboxPaths()
+		if err != nil {
+			return err
+		}
+		ro = append(ro, confRO...)
+		rw = append(rw, confRW...)
+
+		// Required to mount the file in the sandbox.
+		f, err := os.Create(sealOpts.Output)
+		if err != nil {
+			return err
+		}
+
+		err = f.Close()
+		if err != nil {
+			return err
+		}
+
+		return sandbox.Run(sandbox.Options{
+			Args: os.Args,
+			RO:   append(ro, args...),
+			RW:   rw,
+		})
 	}
 
 	keys, err := conf.ReadKeyrings()

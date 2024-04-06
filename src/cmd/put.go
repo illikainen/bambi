@@ -2,16 +2,19 @@ package cmd
 
 import (
 	"net/url"
+	"os"
 	"path/filepath"
 
 	"github.com/illikainen/bambi/src/archive"
 	"github.com/illikainen/bambi/src/config"
 
 	"github.com/illikainen/go-cryptor/src/blob"
+	"github.com/illikainen/go-netutils/src/sshx"
 	"github.com/illikainen/go-netutils/src/transport"
 	"github.com/illikainen/go-utils/src/cobrax"
 	"github.com/illikainen/go-utils/src/errorx"
 	"github.com/illikainen/go-utils/src/iofs"
+	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -55,6 +58,50 @@ func putRun(_ *cobra.Command, args []string) (err error) {
 	uri, err := url.Parse(args[0])
 	if err != nil {
 		return err
+	}
+
+	if sandbox.Compatible() && !sandbox.IsSandboxed() {
+		ro := []string{putOpts.Input}
+		rw := []string{}
+
+		confRO, confRW, err := conf.SandboxPaths()
+		if err != nil {
+			return err
+		}
+		ro = append(ro, confRO...)
+		rw = append(rw, confRW...)
+
+		sshRO, sshRW, err := sshx.SandboxPaths()
+		if err != nil {
+			return err
+		}
+		ro = append(ro, sshRO...)
+		rw = append(rw, sshRW...)
+
+		if uri.Scheme == "file" {
+			f, err := os.Create(uri.Path)
+			if err != nil {
+				return err
+			}
+
+			err = f.Close()
+			if err != nil {
+				return err
+			}
+
+			rw = append(rw, uri.Path)
+		}
+		err = sandbox.Run(sandbox.Options{
+			Args:  os.Args,
+			RO:    ro,
+			RW:    append(rw, args[1:]...),
+			Share: sandbox.ShareNet,
+		})
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	xfer, err := transport.New(uri)

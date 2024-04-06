@@ -31,7 +31,7 @@ disabled = true
 disabled = true
 
 [rule.function-length]
-arguments = [100,150]
+arguments = [100,200]
 
 [rule.function-result-limit]
 arguments = [3]
