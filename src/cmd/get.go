@@ -1,0 +1,131 @@
+package cmd
+
+import (
+	"net/url"
+	"path/filepath"
+
+	"github.com/illikainen/bambi/src/archive"
+	"github.com/illikainen/bambi/src/config"
+
+	"github.com/illikainen/go-cryptor/src/blob"
+	"github.com/illikainen/go-netutils/src/transport"
+	"github.com/illikainen/go-utils/src/cobrax"
+	"github.com/illikainen/go-utils/src/errorx"
+	"github.com/illikainen/go-utils/src/iofs"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+)
+
+var getOpts struct {
+	transport.DownloadOptions
+}
+
+var getCmd = &cobra.Command{
+	Use:     "get [flags] <url>",
+	Short:   "Download and verify a signed and encrypted archive",
+	PreRunE: getPreRun,
+	Run:     cobrax.Run(getRun),
+	Args:    cobrax.ValidateArgsLength(1, 1),
+}
+
+func init() {
+	flags := transport.DownloadFlags(transport.DownloadConfig{
+		Options: &getOpts.DownloadOptions,
+	})
+	getCmd.Flags().AddFlagSet(flags)
+
+	rootCmd.AddCommand(getCmd)
+}
+
+func getPreRun(_ *cobra.Command, _ []string) error {
+	if getOpts.Output == "" && getOpts.Extract == "" {
+		return errors.Errorf("--output and/or --extract is required")
+	}
+
+	return nil
+}
+
+func getRun(_ *cobra.Command, args []string) (err error) {
+	conf, err := config.Read(rootOpts.config)
+	if err != nil {
+		return err
+	}
+
+	keys, err := conf.ReadKeyrings()
+	if err != nil {
+		return err
+	}
+
+	uri, err := url.Parse(args[0])
+	if err != nil {
+		return err
+	}
+
+	xfer, err := transport.New(uri)
+	if err != nil {
+		return err
+	}
+
+	tmpDir, tmpClean, err := iofs.MkdirTemp()
+	if err != nil {
+		return err
+	}
+	defer errorx.Defer(tmpClean, &err)
+
+	tmpBlob := filepath.Join(tmpDir, "blob")
+	data, err := blob.New(blob.Config{
+		Path:      tmpBlob,
+		Keys:      keys,
+		Transport: xfer,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = data.Download(uri.Path)
+	if err != nil {
+		return err
+	}
+
+	tmpCiphertext := filepath.Join(tmpDir, "ciphertext")
+	meta, err := data.Verify(tmpCiphertext)
+	if err != nil {
+		return err
+	}
+
+	if !meta.Encrypted {
+		return errors.Errorf("%s: not encrypted", getOpts.Output)
+	}
+
+	if getOpts.Extract != "" {
+		tmpPlaintext := filepath.Join(tmpDir, "plaintext")
+		err := data.Decrypt(tmpCiphertext, tmpPlaintext, meta.Keys)
+		if err != nil {
+			return err
+		}
+
+		arch, err := archive.Open(tmpPlaintext)
+		if err != nil {
+			return err
+		}
+
+		err = arch.ExtractAll(getOpts.Extract)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("successfully extracted sealed blob from %s to %s", uri, getOpts.Extract)
+	}
+
+	if getOpts.Output != "" {
+		err := iofs.MoveFile(tmpBlob, getOpts.Output)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("successfully wrote sealed blob from %s to %s", uri, getOpts.Output)
+	}
+
+	return nil
+}

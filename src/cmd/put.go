@@ -1,0 +1,149 @@
+package cmd
+
+import (
+	"net/url"
+	"path/filepath"
+
+	"github.com/illikainen/bambi/src/archive"
+	"github.com/illikainen/bambi/src/config"
+
+	"github.com/illikainen/go-cryptor/src/blob"
+	"github.com/illikainen/go-netutils/src/transport"
+	"github.com/illikainen/go-utils/src/cobrax"
+	"github.com/illikainen/go-utils/src/errorx"
+	"github.com/illikainen/go-utils/src/iofs"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+)
+
+var putOpts struct {
+	transport.UploadOptions
+}
+
+var putCmd = &cobra.Command{
+	Use: "put [flags] <url> [<file>...]",
+	Long: "Upload a signed and encrypted archive.\n\n" +
+		"If a file is provided with -i, the file is verified as a signed and\n" +
+		"encrypted archive before being uploaded to <url>.  Otherwise, an\n" +
+		"arbitrary number of files must be provided after <url>.  The files are\n" +
+		"written to a signed and encrypted archive before being uploaded to to <url>.\n",
+	Run:  cobrax.Run(putRun),
+	Args: cobrax.ValidateArgsLength(1, -1),
+}
+
+func init() {
+	flags := transport.UploadFlags(transport.UploadConfig{
+		Options: &putOpts.UploadOptions,
+	})
+	putCmd.Flags().AddFlagSet(flags)
+
+	rootCmd.AddCommand(putCmd)
+}
+
+func putRun(_ *cobra.Command, args []string) (err error) {
+	conf, err := config.Read(rootOpts.config)
+	if err != nil {
+		return err
+	}
+
+	keys, err := conf.ReadKeyrings()
+	if err != nil {
+		return err
+	}
+
+	uri, err := url.Parse(args[0])
+	if err != nil {
+		return err
+	}
+
+	xfer, err := transport.New(uri)
+	if err != nil {
+		return err
+	}
+
+	data := &blob.Blob{}
+
+	if putOpts.Input != "" {
+		data, err = blob.New(blob.Config{
+			Path:      putOpts.Input,
+			Keys:      keys,
+			Transport: xfer,
+		})
+		if err != nil {
+			return err
+		}
+
+		meta, err := data.Verify("")
+		if err != nil {
+			return err
+		}
+
+		if !meta.Encrypted {
+			return errors.Errorf("%s: not encrypted", putOpts.Input)
+		}
+	} else {
+		if len(args) < 2 {
+			return errors.Errorf("no file(s) provided")
+		}
+
+		tmpDir, tmpClean, err := iofs.MkdirTemp()
+		if err != nil {
+			return err
+		}
+		defer errorx.Defer(tmpClean, &err)
+
+		tmpArch := filepath.Join(tmpDir, "archive")
+		arch, err := archive.Create(tmpArch)
+		if err != nil {
+			return err
+		}
+
+		err = arch.AddAll(args[1:]...)
+		if err != nil {
+			return errorx.Join(err, arch.Close())
+		}
+
+		err = arch.Close()
+		if err != nil {
+			return err
+		}
+
+		data, err = blob.New(blob.Config{
+			Path:      filepath.Join(tmpDir, "blob"),
+			Keys:      keys,
+			Transport: xfer,
+		})
+		if err != nil {
+			return err
+		}
+
+		err = data.Import(tmpArch, nil)
+		if err != nil {
+			return err
+		}
+
+		err = data.Encrypt()
+		if err != nil {
+			return err
+		}
+
+		err = data.Sign()
+		if err != nil {
+			return err
+		}
+
+		_, err = data.Verify("")
+		if err != nil {
+			return err
+		}
+	}
+
+	err = data.Upload(uri.Path)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("successfully uploaded sealed blob to %s", uri)
+	return nil
+}

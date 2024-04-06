@@ -1,0 +1,10 @@
+# The checksums for go.sum and go.mod are pinned because `go mod` with
+# `-mod=readonly` isn't read-only.  The `go mod` commands will still modify the
+# dependency tree if they find it necessary (e.g., to add a missing module or
+# module checksum).
+#
+# Run `make pin` to update this file.
+6b9464f356fb0245c796c41791e8f39083a1df2a58e47cfc0c8b482fdbab654d  go.sum
+bd8d69bc42cb54730701339497c6c1551f36e7234e39d5be9c2c11f49e478f68  go.mod
+a77050fc703241bf877b334192083d631d3c747c12e3c72b73ec9f2fc70f4b47  tools/go.sum
+93a5e15ae1708f97f347ba80564dbae29c38e5ef406ca642e686988960d466c7  tools/go.mod
