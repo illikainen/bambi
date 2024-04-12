@@ -50,7 +50,7 @@ func putRun(_ *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	keys, err := conf.ReadKeyrings()
+	keys, err := conf.ReadKeyring()
 	if err != nil {
 		return err
 	}

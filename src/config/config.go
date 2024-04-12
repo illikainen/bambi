@@ -56,7 +56,7 @@ func ConfigFile() (string, error) {
 	return filepath.Join(dir, "config.toml"), nil
 }
 
-func (c *Config) ReadKeyrings() (*blob.Keyrings, error) {
+func (c *Config) ReadKeyring() (*blob.Keyring, error) {
 	pubKeys := []cryptor.PublicKey{}
 
 	for _, pubFile := range c.config.PubKeys {
@@ -83,7 +83,7 @@ func (c *Config) ReadKeyrings() (*blob.Keyrings, error) {
 		return nil, err
 	}
 
-	return &blob.Keyrings{Public: pubKeys, Private: privKey}, nil
+	return &blob.Keyring{Public: pubKeys, Private: privKey}, nil
 }
 
 func (c *Config) SandboxPaths() (ro []string, rw []string, err error) {

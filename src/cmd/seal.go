@@ -87,7 +87,7 @@ func sealRun(_ *cobra.Command, args []string) (err error) {
 		})
 	}
 
-	keys, err := conf.ReadKeyrings()
+	keys, err := conf.ReadKeyring()
 	if err != nil {
 		return err
 	}
