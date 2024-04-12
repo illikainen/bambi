@@ -31,15 +31,13 @@ func init() {
 		Options: &genkeyOpts.GenerateKeyOptions,
 	})
 	genkeyCmd.Flags().AddFlagSet(flags)
-	lo.Must0(genkeyCmd.MarkFlagRequired("type"))
-	lo.Must0(genkeyCmd.MarkFlagRequired("purpose"))
 	lo.Must0(genkeyCmd.MarkFlagRequired("output"))
 
 	rootCmd.AddCommand(genkeyCmd)
 }
 
 func genkeyRun(_ *cobra.Command, _ []string) error {
-	pubKey, privKey, err := asymmetric.GenerateKey(genkeyOpts.KeyType.Value, genkeyOpts.Purpose.Value)
+	pubKey, privKey, err := asymmetric.GenerateKey()
 	if err != nil {
 		return err
 	}
@@ -56,6 +54,6 @@ func genkeyRun(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	log.Infof("successfully wrote %s keypair to %s and %s", genkeyOpts.KeyType.Name, pubFile, privFile)
+	log.Infof("successfully wrote %s to %s and %s", pubKey.Fingerprint(), pubFile, privFile)
 	return nil
 }
