@@ -149,7 +149,7 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 			return err
 		}
 
-		log.Infof("successfully extracted sealed blob to %s", unsealOpts.Extract)
+		log.Infof("successfully extracted unsealed blob to %s", unsealOpts.Extract)
 	}
 
 	if unsealOpts.Output != "" {
@@ -158,7 +158,7 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 			return err
 		}
 
-		log.Infof("successfully wrote sealed blob to %s", unsealOpts.Output)
+		log.Infof("successfully wrote unsealed blob to %s", unsealOpts.Output)
 	}
 
 	return nil
