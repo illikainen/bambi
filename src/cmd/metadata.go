@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/illikainen/bambi/src/config"
+	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-cryptor/src/cryptor"
@@ -84,7 +85,11 @@ func metadataRun(_ *cobra.Command, _ []string) (err error) {
 		return err
 	}
 
-	data, err := blob.New(blob.Config{Path: metadataOpts.Input, Keys: keys})
+	data, err := blob.New(blob.Config{
+		Type: metadata.Name(),
+		Path: metadataOpts.Input,
+		Keys: keys,
+	})
 	if err != nil {
 		return err
 	}

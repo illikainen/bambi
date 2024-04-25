@@ -6,6 +6,7 @@ import (
 
 	"github.com/illikainen/bambi/src/archive"
 	"github.com/illikainen/bambi/src/config"
+	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-cryptor/src/cryptor"
@@ -115,6 +116,7 @@ func sealRun(_ *cobra.Command, args []string) (err error) {
 	}
 
 	data, err := blob.New(blob.Config{
+		Type: metadata.Name(),
 		Path: sealOpts.Output,
 		Keys: keys,
 	})

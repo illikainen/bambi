@@ -7,6 +7,7 @@ import (
 
 	"github.com/illikainen/bambi/src/archive"
 	"github.com/illikainen/bambi/src/config"
+	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-netutils/src/sshx"
@@ -113,6 +114,7 @@ func putRun(_ *cobra.Command, args []string) (err error) {
 
 	if putOpts.Input != "" {
 		data, err = blob.New(blob.Config{
+			Type:      metadata.Name(),
 			Path:      putOpts.Input,
 			Keys:      keys,
 			Transport: xfer,
@@ -157,6 +159,7 @@ func putRun(_ *cobra.Command, args []string) (err error) {
 		}
 
 		data, err = blob.New(blob.Config{
+			Type:      metadata.Name(),
 			Path:      filepath.Join(tmpDir, "blob"),
 			Keys:      keys,
 			Transport: xfer,
