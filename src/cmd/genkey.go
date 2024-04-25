@@ -37,7 +37,7 @@ func init() {
 }
 
 func genkeyRun(_ *cobra.Command, _ []string) error {
-	pubKey, privKey, err := asymmetric.GenerateKey()
+	pubKey, privKey, err := asymmetric.GenerateKey(genkeyOpts.Delay)
 	if err != nil {
 		return err
 	}
