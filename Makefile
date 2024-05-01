@@ -77,6 +77,8 @@ release:
 	@mkdir -p $(OUTPUT_RELEASE)
 	@$(SANDBOX) echo "building $(NAME)-$(VERSION) for linux-amd64"
 	@$(SANDBOX) -os=linux -arch=amd64 go build -ldflags "-s -w" -o $(OUTPUT_RELEASE)$(NAME)-$(VERSION)-linux-amd64
+	@$(SANDBOX) echo "building $(NAME)-$(VERSION) for linux-arm64"
+	@$(SANDBOX) -os=linux -arch=arm64 go build -ldflags "-s -w" -o $(OUTPUT_RELEASE)$(NAME)-$(VERSION)-linux-arm64
 	@$(SANDBOX) echo "building $(NAME)-$(VERSION) for darwin-arm64"
 	@$(SANDBOX) -os=darwin -arch=arm64 go build -ldflags "-s -w" -o $(OUTPUT_RELEASE)$(NAME)-$(VERSION)-darwin-arm64
 	@$(SANDBOX) echo "building $(NAME)-$(VERSION) for windows-amd64"
