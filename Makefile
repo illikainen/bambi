@@ -91,7 +91,7 @@ release:
 
 debug:
 	@mkdir -p $(OUTPUT)
-	@$(SANDBOX) go build -o $(OUTPUT)
+	@$(SANDBOX) go build -gcflags "all=-N -l" -o $(OUTPUT)
 	@$(SANDBOX) echo "output stored in $(OUTPUT)"
 
 tools:
