@@ -140,6 +140,7 @@ func getRun(_ *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	defer errorx.Defer(xfer.Close, &err)
 
 	tmpDir, tmpClean, err := iofs.MkdirTemp()
 	if err != nil {

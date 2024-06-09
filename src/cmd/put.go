@@ -109,6 +109,7 @@ func putRun(_ *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	defer errorx.Defer(xfer.Close, &err)
 
 	data := &blob.Blob{}
 
