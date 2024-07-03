@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 
+	"github.com/illikainen/go-utils/src/sandbox"
+
 	"github.com/illikainen/bambi/src/cmd"
 
 	"github.com/fatih/color"
@@ -16,7 +18,9 @@ func main() {
 	color.NoColor = !isatty.IsTerminal(os.Stderr.Fd())
 
 	log.SetOutput(os.Stderr)
-	log.SetFormatter(&logging.SanitizedTextFormatter{})
+	if !sandbox.IsSandboxed() {
+		log.SetFormatter(&logging.SanitizedTextFormatter{})
+	}
 
 	ensure.Unprivileged()
 

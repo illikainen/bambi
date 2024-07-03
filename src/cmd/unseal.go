@@ -12,6 +12,7 @@ import (
 	"github.com/illikainen/go-cryptor/src/cryptor"
 	"github.com/illikainen/go-utils/src/errorx"
 	"github.com/illikainen/go-utils/src/iofs"
+	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
@@ -87,10 +88,12 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 			rw = append(rw, unsealOpts.Extract)
 		}
 
-		err = sandbox.Run(sandbox.Options{
-			Args: os.Args,
-			RO:   ro,
-			RW:   rw,
+		_, err = sandbox.Exec(sandbox.Options{
+			Command: os.Args,
+			RO:      ro,
+			RW:      rw,
+			Stdout:  process.LogrusOutput,
+			Stderr:  process.LogrusOutput,
 		})
 		if err != nil {
 			var outErr error

@@ -15,6 +15,7 @@ import (
 	"github.com/illikainen/go-utils/src/cobrax"
 	"github.com/illikainen/go-utils/src/errorx"
 	"github.com/illikainen/go-utils/src/iofs"
+	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -113,11 +114,13 @@ func getRun(_ *cobra.Command, args []string) (err error) {
 			rw = append(rw, getOpts.Extract)
 		}
 
-		err = sandbox.Run(sandbox.Options{
-			Args:  os.Args,
-			RO:    ro,
-			RW:    rw,
-			Share: sandbox.ShareNet,
+		_, err = sandbox.Exec(sandbox.Options{
+			Command: os.Args,
+			RO:      ro,
+			RW:      rw,
+			Share:   sandbox.ShareNet,
+			Stdout:  process.LogrusOutput,
+			Stderr:  process.LogrusOutput,
 		})
 		if err != nil {
 			var outErr error

@@ -12,6 +12,7 @@ import (
 	"github.com/illikainen/go-cryptor/src/cryptor"
 	"github.com/illikainen/go-utils/src/cobrax"
 	"github.com/illikainen/go-utils/src/errorx"
+	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/illikainen/go-utils/src/stringx"
 	"github.com/pkg/errors"
@@ -73,11 +74,14 @@ func metadataRun(_ *cobra.Command, _ []string) (err error) {
 			rw = append(rw, metadataOpts.Output)
 		}
 
-		return sandbox.Run(sandbox.Options{
-			Args: os.Args,
-			RO:   ro,
-			RW:   rw,
+		_, err = sandbox.Exec(sandbox.Options{
+			Command: os.Args,
+			RO:      ro,
+			RW:      rw,
+			Stdout:  process.LogrusOutput,
+			Stderr:  process.LogrusOutput,
 		})
+		return err
 	}
 
 	keys, err := conf.ReadKeyring()
