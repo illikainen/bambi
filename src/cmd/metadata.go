@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -108,10 +107,7 @@ func metadataRun(_ *cobra.Command, _ []string) (err error) {
 		return err
 	}
 	metaStr := stringx.Sanitize(strings.TrimRight(string(metaData), "\x00"))
-	_, err = fmt.Printf("%s\n", metaStr)
-	if err != nil {
-		return err
-	}
+	log.Infof("%s", metaStr)
 
 	if metadataOpts.Output != "" {
 		f, err := os.Create(metadataOpts.Output)
