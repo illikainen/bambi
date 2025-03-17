@@ -100,7 +100,7 @@ func metadataRun(_ *cobra.Command, _ []string) (err error) {
 		return err
 	}
 
-	metaData, err := meta.Marshal()
+	metaData, err := meta.MarshalIndent()
 	if err != nil {
 		return err
 	}
