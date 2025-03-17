@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"os"
-	"strings"
 
 	"github.com/illikainen/bambi/src/config"
 	"github.com/illikainen/bambi/src/metadata"
@@ -13,7 +12,6 @@ import (
 	"github.com/illikainen/go-utils/src/errorx"
 	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
-	"github.com/illikainen/go-utils/src/stringx"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
@@ -106,8 +104,7 @@ func metadataRun(_ *cobra.Command, _ []string) (err error) {
 	if err != nil {
 		return err
 	}
-	metaStr := stringx.Sanitize(strings.TrimRight(string(metaData), "\x00"))
-	log.Infof("%s", metaStr)
+	log.Infof("%s", metaData)
 
 	if metadataOpts.Output != "" {
 		f, err := os.Create(metadataOpts.Output)
@@ -116,11 +113,11 @@ func metadataRun(_ *cobra.Command, _ []string) (err error) {
 		}
 		defer errorx.Defer(f.Close, &err)
 
-		n, err := f.Write(metaStr)
+		n, err := f.Write(metaData)
 		if err != nil {
 			return err
 		}
-		if n != len(metaStr) {
+		if n != len(metaData) {
 			return errors.Errorf("invalid write size")
 		}
 
