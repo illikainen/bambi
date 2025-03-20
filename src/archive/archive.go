@@ -1,7 +1,8 @@
 package archive
 
 import (
-	"archive/zip"
+	"archive/tar"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/illikainen/go-utils/src/errorx"
 	"github.com/illikainen/go-utils/src/iofs"
+	"github.com/illikainen/go-utils/src/stringx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -16,7 +18,7 @@ import (
 type ArchiveWriter struct {
 	path   string
 	file   *os.File
-	writer *zip.Writer
+	writer *tar.Writer
 }
 
 func Create(path string) (*ArchiveWriter, error) {
@@ -30,62 +32,66 @@ func Create(path string) (*ArchiveWriter, error) {
 	return &ArchiveWriter{
 		path:   path,
 		file:   file,
-		writer: zip.NewWriter(file),
+		writer: tar.NewWriter(file),
 	}, nil
 }
 
-func (a *ArchiveWriter) Close() error {
-	return errorx.Join(a.writer.Close(), a.file.Close())
+func (w *ArchiveWriter) Close() error {
+	return errorx.Join(w.writer.Close(), w.file.Close())
 }
 
-func (a *ArchiveWriter) AddFile(path string) error {
-	name := filepath.Clean(path)
+func (w *ArchiveWriter) addFile(path string, info fs.FileInfo) (err error) {
+	link := ""
+	mode := info.Mode()
 
-	// FIXME: File names must be relative but this is insufficient (e.g.,
-	// C:).  This doesn't affect us from a security point of view because
-	// we validate file names during the extraction.  However, it will
-	// probably break Windows environments.
+	if mode&os.ModeSymlink == os.ModeSymlink {
+		link, err = os.Readlink(path)
+		if err != nil {
+			return err
+		}
+		log.Infof("adding '%s' (symlink to '%s')", path, link)
+	} else if mode.IsRegular() {
+		log.Infof("adding '%s' (regular)", path)
+	} else if mode.IsDir() {
+		log.Infof("adding '%s' (directory)", path)
+	} else {
+		return errors.Errorf("%s: unsupported file type", path)
+	}
+
+	hdr, err := tar.FileInfoHeader(info, link)
+	if err != nil {
+		return err
+	}
+
+	name := filepath.Clean(path)
 	if filepath.IsAbs(name) {
 		name = strings.TrimLeft(name, string(os.PathSeparator))
 	}
+	hdr.Name = name
 
-	// ZIP paths are separated by forward slashes.
-	name = strings.ReplaceAll(name, string(os.PathSeparator), "/")
-
-	log.Infof("adding: %s", path)
-
-	stat, err := os.Stat(path)
+	err = w.writer.WriteHeader(hdr)
 	if err != nil {
 		return err
 	}
 
-	hdr := &zip.FileHeader{
-		Name:   name,
-		Method: zip.Deflate,
+	if mode.IsRegular() {
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer errorx.Defer(f.Close, &err)
+		return iofs.Copy(w.writer, f)
 	}
-	hdr.SetMode(stat.Mode().Perm())
-
-	outf, err := a.writer.CreateHeader(hdr)
-	if err != nil {
-		return err
-	}
-	return iofs.Copy(outf, path)
+	return nil
 }
 
-func (a *ArchiveWriter) AddAll(paths ...string) (err error) {
+func (w *ArchiveWriter) AddAll(paths ...string) (err error) {
 	for _, path := range paths {
 		err = filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
-			if err != nil {
-				if err == filepath.SkipDir {
-					return errors.Errorf("unknown error")
-				}
-				return err
+			if err == nil {
+				return w.addFile(path, info)
 			}
-
-			if !info.IsDir() {
-				return a.AddFile(path)
-			}
-			return nil
+			return err
 		})
 		if err != nil {
 			return err
@@ -98,75 +104,241 @@ func (a *ArchiveWriter) AddAll(paths ...string) (err error) {
 type ArchiveReader struct {
 	path   string
 	file   *os.File
-	reader *zip.Reader
+	reader *tar.Reader
 }
 
 func Open(path string) (*ArchiveReader, error) {
 	log.Tracef("%s: opening archive", path)
 
-	file, err := os.Open(path) // #nosec G304
-	if err != nil {
-		return nil, err
-	}
-
-	stat, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	reader, err := zip.NewReader(file, stat.Size())
+	f, err := os.Open(path) // #nosec G304
 	if err != nil {
 		return nil, err
 	}
 
 	return &ArchiveReader{
 		path:   path,
-		file:   file,
-		reader: reader,
+		file:   f,
+		reader: tar.NewReader(f),
 	}, nil
 }
 
-func (a *ArchiveReader) Close() error {
-	return a.file.Close()
+func (r *ArchiveReader) Close() error {
+	return r.file.Close()
 }
 
-func (a *ArchiveReader) ExtractAll(path string) (err error) {
-	pathAbs, err := filepath.Abs(path)
+func (r *ArchiveReader) ExtractAll(basedir string) (err error) {
+	basedir = filepath.Clean(basedir)
+
+	entries, err := r.List()
 	if err != nil {
 		return err
 	}
 
-	for _, file := range a.reader.File {
-		name := strings.ReplaceAll(file.Name, "/", string(os.PathSeparator))
-
-		dst := filepath.Join(path, name)
-		dstAbs, err := filepath.Abs(dst)
+	for _, entry := range entries {
+		dst, err := r.getExtractPath(basedir, entry.Path)
 		if err != nil {
 			return err
 		}
 
-		if !strings.HasPrefix(dstAbs, pathAbs+string(os.PathSeparator)) {
-			return errors.Errorf("%s: invalid name", file.Name)
-		}
-
-		log.Infof("extracting: %s", dst)
-
-		dir, _ := filepath.Split(dst)
-		err = os.MkdirAll(dir, 0700)
+		exists, err := iofs.Exists(dst)
 		if err != nil {
 			return err
 		}
 
-		dstf, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, file.Mode().Perm()) // #nosec G304
-		if err != nil {
-			return err
+		if exists {
+			return errors.Errorf("%s already exist", dst)
 		}
 
-		err = iofs.Copy(dstf, file)
-		if err != nil {
-			return err
+		if entry.LinkPath != "" {
+			linkDst, err := r.getLinkPath(basedir, dst, entry.LinkPath)
+			if err != nil {
+				return err
+			}
+
+			exists, err := iofs.Exists(linkDst)
+			if err != nil {
+				return err
+			}
+
+			if exists {
+				return errors.Errorf("%s already exist", linkDst)
+			}
 		}
 	}
 
+	for {
+		hdr, err := r.reader.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+
+		dst, err := r.getExtractPath(basedir, hdr.Name)
+		if err != nil {
+			return err
+		}
+
+		if hdr.Typeflag == tar.TypeSymlink {
+			linkDst, err := r.getLinkPath(basedir, dst, hdr.Linkname)
+			if err != nil {
+				return err
+			}
+			log.Infof("extracting '%s' (symlink to '%s')", dst, linkDst)
+
+			err = os.Symlink(linkDst, dst)
+			if err != nil {
+				return err
+			}
+		} else if hdr.Typeflag == tar.TypeReg {
+			log.Infof("extracting '%s' (regular)", dst)
+
+			err := os.MkdirAll(filepath.Dir(dst), 0700)
+			if err != nil {
+				return err
+			}
+
+			perm := fs.FileMode(0600)
+			if hdr.Mode&0100 == 0100 {
+				log.Tracef("setting executable bit on '%s'", dst)
+				perm |= 0100
+			}
+
+			f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, perm) // #nosec G304
+			if err != nil {
+				return err
+			}
+
+			err = iofs.Copy(f, r.reader)
+			if err != nil {
+				return err
+			}
+
+			err = f.Close()
+			if err != nil {
+				return err
+			}
+		} else if hdr.Typeflag == tar.TypeDir {
+			log.Infof("extracting '%s' (dir)", dst)
+
+			err := os.MkdirAll(dst, 0700)
+			if err != nil {
+				return err
+			}
+		} else {
+			return errors.Errorf("%s: unsupported file type", hdr.Name)
+		}
+	}
+
+	return nil
+}
+
+func (r *ArchiveReader) getExtractPath(basedir string, name string) (string, error) {
+	cleanName := filepath.Clean(name)
+	if filepath.IsAbs(cleanName) {
+		return "", errors.Errorf("%s: absolute path", cleanName)
+	}
+
+	path := filepath.Join(basedir, cleanName)
+
+	// TODO: uncomment on Go >=1.20
+	// if !filepath.IsLocal(path) {
+	// 	return "", errors.Errorf("%s: not a local path", path)
+	// }
+
+	// filepath.Clean() (invoked by Join() and other functions) translates:
+	//
+	// ./foo//bar/baz/../dst to foo/bar/dst
+	// . to .
+	//
+	// If basedir is a lone '.', we need to prepend it or the prefix
+	// validation fail because it's stripped from the full path.
+	if basedir == "." {
+		path = "." + string(os.PathSeparator) + path
+	}
+
+	if !strings.HasPrefix(path, basedir+string(os.PathSeparator)) {
+		return "", errors.Errorf("%s: invalid location", path)
+	}
+
+	if stringx.Sanitize(path) != path {
+		return "", errors.Errorf("%s: invalid characters", path)
+	}
+
+	return path, nil
+}
+
+func (r *ArchiveReader) getLinkPath(basedir string, name string, linkname string) (string, error) {
+	if filepath.IsAbs(filepath.Clean(linkname)) {
+		return "", errors.Errorf("%s: absolute path", linkname)
+	}
+
+	// We don't use filepath.Join() here because it resolves '..'.  Note
+	// that '..' is also resolved by filepath.Clean() which is validated
+	// below.
+	dir, _ := filepath.Split(name)
+	path := dir + string(os.PathSeparator) + linkname
+
+	// TODO: uncomment on Go >=1.20
+	// if !filepath.IsLocal(filepath.Clean(path)) {
+	// 	return "", errors.Errorf("%s: not a local path", path)
+	// }
+
+	prefix := ""
+	if basedir == "." {
+		prefix = "." + string(os.PathSeparator)
+	}
+
+	if !strings.HasPrefix(prefix+filepath.Clean(path), basedir+string(os.PathSeparator)) {
+		return "", errors.Errorf("%s: invalid symlink target", path)
+	}
+
+	if stringx.Sanitize(path) != path {
+		return "", errors.Errorf("%s: invalid symlink characters", path)
+	}
+
+	return linkname, nil
+}
+
+type Entry struct {
+	Path     string
+	LinkPath string
+	Mode     string
+}
+
+func (r *ArchiveReader) List() ([]Entry, error) {
+	entries := []Entry{}
+
+	for {
+		hdr, err := r.reader.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		entries = append(entries, Entry{
+			Path:     hdr.Name,
+			LinkPath: hdr.Linkname,
+			Mode:     hdr.FileInfo().Mode().String(),
+		})
+	}
+
+	err := r.reset()
+	if err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
+func (r *ArchiveReader) reset() error {
+	_, err := r.file.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	r.reader = tar.NewReader(r.file)
 	return nil
 }
