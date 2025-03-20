@@ -108,6 +108,7 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 
 			return errorx.Join(err, outErr, extErr)
 		}
+		return nil
 	}
 
 	keys, err := conf.ReadKeyring()
