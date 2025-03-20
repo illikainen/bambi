@@ -79,10 +79,19 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 		}
 
 		// See ^
+		extractDirCreated := false
 		if unsealOpts.Extract != "" {
-			err := os.Mkdir(unsealOpts.Extract, 0700)
+			exists, err := iofs.Exists(unsealOpts.Extract)
 			if err != nil {
 				return err
+			}
+
+			if !exists {
+				err := os.Mkdir(unsealOpts.Extract, 0700)
+				if err != nil {
+					return err
+				}
+				extractDirCreated = true
 			}
 
 			rw = append(rw, unsealOpts.Extract)
@@ -102,7 +111,7 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 			}
 
 			var extErr error
-			if unsealOpts.Extract != "" {
+			if unsealOpts.Extract != "" && extractDirCreated {
 				extErr = os.RemoveAll(unsealOpts.Extract)
 			}
 
