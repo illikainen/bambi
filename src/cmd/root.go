@@ -8,6 +8,7 @@ import (
 	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-utils/src/flag"
+	"github.com/illikainen/go-utils/src/logging"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -15,7 +16,7 @@ import (
 var rootOpts struct {
 	config    config.Config
 	profile   string
-	verbosity string
+	verbosity logging.LogLevel
 	privKey   flag.Path
 	pubKeys   flag.PathSlice
 }
@@ -47,8 +48,7 @@ func init() {
 
 	flags.Var(&rootOpts.config, "config", "Configuration file")
 	flags.StringVarP(&rootOpts.profile, "profile", "p", "", "Profile to use")
-	flags.StringVar(&rootOpts.verbosity, "verbosity", "info",
-		fmt.Sprintf("Verbosity (%s)", strings.Join(levels, ", ")))
+	flags.Var(&rootOpts.verbosity, "verbosity", fmt.Sprintf("Verbosity (%s)", strings.Join(levels, ", ")))
 	flags.Var(&rootOpts.privKey, "privkey", "Private key file")
 	flags.Var(&rootOpts.pubKeys, "pubkeys", "Public key file(s)")
 }
@@ -75,12 +75,6 @@ func rootPreRun(cmd *cobra.Command, _ []string) error {
 	if err := flag.SetFallback(flags, "pubkeys", pcfg.PubKeys, cfg.PubKeys); err != nil {
 		return err
 	}
-
-	level, err := log.ParseLevel(rootOpts.verbosity)
-	if err != nil {
-		return err
-	}
-	log.SetLevel(level)
 
 	return nil
 }
