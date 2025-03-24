@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/illikainen/bambi/src/config"
 	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-cryptor/src/blob"
@@ -41,16 +40,11 @@ func init() {
 }
 
 func metadataRun(_ *cobra.Command, _ []string) (err error) {
-	conf, err := config.Read(rootOpts.config)
-	if err != nil {
-		return err
-	}
-
 	if sandbox.Compatible() && !sandbox.IsSandboxed() {
 		ro := []string{metadataOpts.Input}
 		rw := []string{}
 
-		confRO, confRW, err := conf.SandboxPaths()
+		confRO, confRW, err := rootOpts.config.SandboxPaths()
 		if err != nil {
 			return err
 		}
@@ -82,7 +76,7 @@ func metadataRun(_ *cobra.Command, _ []string) (err error) {
 		return err
 	}
 
-	keys, err := conf.ReadKeyring()
+	keys, err := rootOpts.config.ReadKeyring()
 	if err != nil {
 		return err
 	}

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/illikainen/bambi/src/archive"
-	"github.com/illikainen/bambi/src/config"
 	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-cryptor/src/blob"
@@ -52,12 +51,7 @@ func getPreRun(_ *cobra.Command, _ []string) error {
 }
 
 func getRun(_ *cobra.Command, args []string) (err error) {
-	conf, err := config.Read(rootOpts.config)
-	if err != nil {
-		return err
-	}
-
-	keys, err := conf.ReadKeyring()
+	keys, err := rootOpts.config.ReadKeyring()
 	if err != nil {
 		return err
 	}
@@ -71,7 +65,7 @@ func getRun(_ *cobra.Command, args []string) (err error) {
 		ro := []string{}
 		rw := []string{}
 
-		confRO, confRW, err := conf.SandboxPaths()
+		confRO, confRW, err := rootOpts.config.SandboxPaths()
 		if err != nil {
 			return err
 		}

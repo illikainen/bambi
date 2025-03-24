@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/illikainen/bambi/src/archive"
-	"github.com/illikainen/bambi/src/config"
 	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-cryptor/src/blob"
@@ -46,16 +45,11 @@ func init() {
 }
 
 func unsealRun(_ *cobra.Command, _ []string) (err error) {
-	conf, err := config.Read(rootOpts.config)
-	if err != nil {
-		return err
-	}
-
 	if sandbox.Compatible() && !sandbox.IsSandboxed() {
 		ro := []string{unsealOpts.Input}
 		rw := []string{}
 
-		confRO, confRW, err := conf.SandboxPaths()
+		confRO, confRW, err := rootOpts.config.SandboxPaths()
 		if err != nil {
 			return err
 		}
@@ -119,7 +113,7 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 		return nil
 	}
 
-	keys, err := conf.ReadKeyring()
+	keys, err := rootOpts.config.ReadKeyring()
 	if err != nil {
 		return err
 	}

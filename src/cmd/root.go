@@ -14,7 +14,7 @@ import (
 )
 
 var rootOpts struct {
-	config    string
+	config    config.Config
 	verbosity string
 }
 
@@ -43,16 +43,7 @@ func init() {
 		levels = append(levels, level.String())
 	}
 
-	flag.PathVarP(
-		flags,
-		&rootOpts.config,
-		"config",
-		"",
-		flag.Path{
-			Value: lo.Must(config.ConfigFile()),
-		},
-		"Config file",
-	)
+	flags.Var(&rootOpts.config, "config", "Configuration file")
 
 	flags.StringVarP(
 		&rootOpts.verbosity,
