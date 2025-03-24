@@ -15,28 +15,19 @@ import (
 )
 
 type ArchiveReader struct {
-	path   string
-	file   *os.File
-	reader *tar.Reader
+	reader io.ReadSeeker
+	tar    *tar.Reader
 }
 
-func Open(path string) (*ArchiveReader, error) {
-	log.Tracef("%s: opening archive", path)
-
-	f, err := os.Open(path) // #nosec G304
-	if err != nil {
-		return nil, err
-	}
-
+func NewReader(r io.ReadSeeker) (*ArchiveReader, error) {
 	return &ArchiveReader{
-		path:   path,
-		file:   f,
-		reader: tar.NewReader(f),
+		reader: r,
+		tar:    tar.NewReader(r),
 	}, nil
 }
 
 func (r *ArchiveReader) Close() error {
-	return r.file.Close()
+	return nil
 }
 
 // revive:disable-next-line
@@ -69,7 +60,7 @@ func (r *ArchiveReader) ExtractAll(basedir string) (err error) {
 				return err
 			}
 
-			exists, err := iofs.Exists(linkDst)
+			exists, err := iofs.Exists(filepath.Join(filepath.Dir(dst), linkDst))
 			if err != nil {
 				return err
 			}
@@ -81,7 +72,7 @@ func (r *ArchiveReader) ExtractAll(basedir string) (err error) {
 	}
 
 	for {
-		hdr, err := r.reader.Next()
+		hdr, err := r.tar.Next()
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -124,7 +115,7 @@ func (r *ArchiveReader) ExtractAll(basedir string) (err error) {
 				return err
 			}
 
-			err = iofs.Copy(f, r.reader)
+			err = iofs.Copy(f, r.tar)
 			if err != nil {
 				return err
 			}
@@ -225,7 +216,7 @@ func (r *ArchiveReader) List() ([]Entry, error) {
 	entries := []Entry{}
 
 	for {
-		hdr, err := r.reader.Next()
+		hdr, err := r.tar.Next()
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -248,11 +239,13 @@ func (r *ArchiveReader) List() ([]Entry, error) {
 }
 
 func (r *ArchiveReader) reset() error {
-	_, err := r.file.Seek(0, io.SeekStart)
+	pos, err := r.reader.Seek(0, io.SeekStart)
 	if err != nil {
 		return err
 	}
-
-	r.reader = tar.NewReader(r.file)
+	if pos != 0 {
+		return errors.Errorf("bug")
+	}
+	r.tar = tar.NewReader(r.reader)
 	return nil
 }

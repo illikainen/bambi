@@ -2,6 +2,7 @@ package archive
 
 import (
 	"archive/tar"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -14,28 +15,17 @@ import (
 )
 
 type ArchiveWriter struct {
-	path   string
-	file   *os.File
-	writer *tar.Writer
+	tar *tar.Writer
 }
 
-func Create(path string) (*ArchiveWriter, error) {
-	log.Tracef("%s: creating archive", path)
-
-	file, err := os.Create(path) // #nosec G304
-	if err != nil {
-		return nil, err
-	}
-
+func NewWriter(w io.Writer) (*ArchiveWriter, error) {
 	return &ArchiveWriter{
-		path:   path,
-		file:   file,
-		writer: tar.NewWriter(file),
+		tar: tar.NewWriter(w),
 	}, nil
 }
 
 func (w *ArchiveWriter) Close() error {
-	return errorx.Join(w.writer.Close(), w.file.Close())
+	return w.tar.Close()
 }
 
 func (w *ArchiveWriter) addFile(path string, info fs.FileInfo) (err error) {
@@ -67,7 +57,7 @@ func (w *ArchiveWriter) addFile(path string, info fs.FileInfo) (err error) {
 	}
 	hdr.Name = name
 
-	err = w.writer.WriteHeader(hdr)
+	err = w.tar.WriteHeader(hdr)
 	if err != nil {
 		return err
 	}
@@ -78,14 +68,14 @@ func (w *ArchiveWriter) addFile(path string, info fs.FileInfo) (err error) {
 			return err
 		}
 		defer errorx.Defer(f.Close, &err)
-		return iofs.Copy(w.writer, f)
+		return iofs.Copy(w.tar, f)
 	}
 	return nil
 }
 
-func (w *ArchiveWriter) AddAll(paths ...string) (err error) {
+func (w *ArchiveWriter) AddAll(paths ...string) error {
 	for _, path := range paths {
-		err = filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
+		err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
 			if err == nil {
 				return w.addFile(path, info)
 			}
