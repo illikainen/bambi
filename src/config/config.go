@@ -15,51 +15,47 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type Config struct {
-	path     string
-	config   Root
-	metadata toml.MetaData
-}
-
 type Root struct {
-	PubKeys []string
-	PrivKey string
+	Settings
+	Profiles map[string]Settings
 }
 
-func Read(path string) (*Config, error) {
-	log.Debugf("%s: reading config", path)
-
-	config := Root{}
-	meta, err := toml.DecodeFile(path, &config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Config{path: path, config: config, metadata: meta}, nil
+type Settings struct {
+	PrivKey   string
+	PubKeys   []string
+	Verbosity string
+	URL       string
 }
 
-func ConfigDir() (string, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(dir, metadata.Name()), nil
+type Config struct {
+	Root
+	Value string
 }
 
-func ConfigFile() (string, error) {
-	dir, err := ConfigDir()
+func (c *Config) Set(value string) error {
+	log.Debugf("%s: reading config", value)
+
+	_, err := toml.DecodeFile(value, &c.Root)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	return filepath.Join(dir, "config.toml"), nil
+	c.Value = value
+	return nil
+}
+
+func (c *Config) String() string {
+	return c.Value
+}
+
+func (c *Config) Type() string {
+	return "config"
 }
 
 func (c *Config) ReadKeyring() (*blob.Keyring, error) {
 	pubKeys := []cryptor.PublicKey{}
 
-	for _, pubFile := range c.config.PubKeys {
+	for _, pubFile := range c.PubKeys {
 		path, err := expand(pubFile)
 		if err != nil {
 			return nil, err
@@ -73,7 +69,7 @@ func (c *Config) ReadKeyring() (*blob.Keyring, error) {
 		pubKeys = append(pubKeys, pubKey)
 	}
 
-	path, err := expand(c.config.PrivKey)
+	path, err := expand(c.PrivKey)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +83,8 @@ func (c *Config) ReadKeyring() (*blob.Keyring, error) {
 }
 
 func (c *Config) SandboxPaths() (ro []string, rw []string, err error) {
-	roOrig := []string{c.path, c.config.PrivKey}
-	roOrig = append(roOrig, c.config.PubKeys...)
+	roOrig := []string{c.Value, c.PrivKey}
+	roOrig = append(roOrig, c.PubKeys...)
 
 	for _, path := range roOrig {
 		realPath, err := expand(path)
@@ -114,4 +110,22 @@ func expand(path string) (string, error) {
 	}
 
 	return realPath, nil
+}
+
+func ConfigDir() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(dir, metadata.Name()), nil
+}
+
+func ConfigFile() (string, error) {
+	dir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(dir, "config.toml"), nil
 }
