@@ -1,8 +1,8 @@
 package cmd
 
 import (
+	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/illikainen/bambi/src/archive"
 	"github.com/illikainen/bambi/src/config"
@@ -14,7 +14,6 @@ import (
 	"github.com/illikainen/go-utils/src/iofs"
 	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
-	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -125,42 +124,27 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 		return err
 	}
 
-	cipherBlob, err := blob.New(blob.Config{
-		Type: metadata.Name(),
-		Path: unsealOpts.Input,
-		Keys: keys,
+	f, err := os.Open(unsealOpts.Input)
+	if err != nil {
+		return err
+	}
+	defer errorx.Defer(f.Close, &err)
+
+	blobber, err := blob.NewReader(f, &blob.Options{
+		Type:      metadata.Name(),
+		Keyring:   keys,
+		Encrypted: true,
 	})
 	if err != nil {
 		return err
 	}
 
-	tmpDir, tmpClean, err := iofs.MkdirTemp()
-	if err != nil {
-		return err
-	}
-	defer errorx.Defer(tmpClean, &err)
-
-	tmpCiphertext := filepath.Join(tmpDir, "ciphertext")
-	meta, err := cipherBlob.Verify(tmpCiphertext)
-	if err != nil {
-		return err
-	}
-
-	if !meta.Encrypted {
-		return errors.Errorf("%s: not encrypted", unsealOpts.Input)
-	}
-
 	if unsealOpts.Extract != "" {
-		tmpPlaintext := filepath.Join(tmpDir, "plaintext")
-		err := cipherBlob.Decrypt(tmpCiphertext, tmpPlaintext, meta.Keys)
+		arch, err := archive.NewReader(blobber)
 		if err != nil {
 			return err
 		}
-
-		arch, err := archive.Open(tmpPlaintext)
-		if err != nil {
-			return err
-		}
+		defer errorx.Defer(arch.Close, &err)
 
 		err = arch.ExtractAll(unsealOpts.Extract)
 		if err != nil {
@@ -171,7 +155,13 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 	}
 
 	if unsealOpts.Output != "" {
-		err = cipherBlob.Decrypt(tmpCiphertext, unsealOpts.Output, meta.Keys)
+		outf, err := os.Create(unsealOpts.Output)
+		if err != nil {
+			return err
+		}
+		defer errorx.Defer(outf.Close, &err)
+
+		_, err = io.Copy(outf, blobber)
 		if err != nil {
 			return err
 		}

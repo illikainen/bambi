@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/illikainen/bambi/src/archive"
 	"github.com/illikainen/bambi/src/config"
@@ -11,7 +10,6 @@ import (
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-cryptor/src/cryptor"
 	"github.com/illikainen/go-utils/src/errorx"
-	"github.com/illikainen/go-utils/src/iofs"
 	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/pkg/errors"
@@ -97,48 +95,29 @@ func sealRun(_ *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	tmpDir, tmpClean, err := iofs.MkdirTemp()
+	output, err := os.Create(sealOpts.Output)
 	if err != nil {
 		return err
 	}
-	defer errorx.Defer(tmpClean, &err)
+	defer errorx.Defer(output.Close, &err)
 
-	tmpArch := filepath.Join(tmpDir, "archive")
-	arch, err := archive.Create(tmpArch)
-	if err != nil {
-		return err
-	}
-
-	err = arch.AddAll(args...)
-	if err != nil {
-		return errorx.Join(err, arch.Close())
-	}
-
-	err = arch.Close()
-	if err != nil {
-		return err
-	}
-
-	data, err := blob.New(blob.Config{
-		Type: metadata.Name(),
-		Path: sealOpts.Output,
-		Keys: keys,
+	blobber, err := blob.NewWriter(output, &blob.Options{
+		Type:      metadata.Name(),
+		Keyring:   keys,
+		Encrypted: true,
 	})
 	if err != nil {
 		return err
 	}
+	defer errorx.Defer(blobber.Close, &err)
 
-	err = data.Import(tmpArch, nil)
+	arch, err := archive.NewWriter(blobber)
 	if err != nil {
 		return err
 	}
+	defer errorx.Defer(arch.Close, &err)
 
-	err = data.Encrypt()
-	if err != nil {
-		return err
-	}
-
-	err = data.Sign()
+	err = arch.AddAll(args...)
 	if err != nil {
 		return err
 	}

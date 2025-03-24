@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 
 	"github.com/illikainen/bambi/src/config"
@@ -86,26 +87,28 @@ func metadataRun(_ *cobra.Command, _ []string) (err error) {
 		return err
 	}
 
-	data, err := blob.New(blob.Config{
-		Type: metadata.Name(),
-		Path: metadataOpts.Input,
-		Keys: keys,
+	f, err := os.Open(metadataOpts.Input)
+	if err != nil {
+		return err
+	}
+	defer errorx.Defer(f.Close, &err)
+
+	blobber, err := blob.NewReader(f, &blob.Options{
+		Type:      metadata.Name(),
+		Keyring:   keys,
+		Encrypted: true,
 	})
 	if err != nil {
 		return err
 	}
 
-	meta, err := data.Verify(metadataOpts.Output)
+	meta, err := json.MarshalIndent(blobber.Metadata(), "", "    ")
 	if err != nil {
 		return err
 	}
+	meta = append(meta, '\n')
 
-	metaData, err := meta.MarshalIndent()
-	if err != nil {
-		return err
-	}
-	log.Infof("%s", metaData)
-
+	log.Infof("%s", meta)
 	if metadataOpts.Output != "" {
 		f, err := os.Create(metadataOpts.Output)
 		if err != nil {
@@ -113,11 +116,11 @@ func metadataRun(_ *cobra.Command, _ []string) (err error) {
 		}
 		defer errorx.Defer(f.Close, &err)
 
-		n, err := f.Write(metaData)
+		n, err := f.Write(meta)
 		if err != nil {
 			return err
 		}
-		if n != len(metaData) {
+		if n != len(meta) {
 			return errors.Errorf("invalid write size")
 		}
 

@@ -139,52 +139,35 @@ func getRun(_ *cobra.Command, args []string) (err error) {
 		return nil
 	}
 
-	xfer, err := transport.New(uri)
-	if err != nil {
-		return err
-	}
-	defer errorx.Defer(xfer.Close, &err)
+	output := getOpts.Output
+	if output == "" {
+		tmpDir, tmpClean, err := iofs.MkdirTemp()
+		if err != nil {
+			return err
+		}
+		defer errorx.Defer(tmpClean, &err)
 
-	tmpDir, tmpClean, err := iofs.MkdirTemp()
-	if err != nil {
-		return err
+		output = filepath.Join(tmpDir, "blob")
 	}
-	defer errorx.Defer(tmpClean, &err)
 
-	tmpBlob := filepath.Join(tmpDir, "blob")
-	data, err := blob.New(blob.Config{
+	f, err := os.OpenFile(output, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // #nosec G304
+	defer errorx.Defer(f.Close, &err)
+
+	blobber, err := blob.Download(uri, f, &blob.Options{
 		Type:      metadata.Name(),
-		Path:      tmpBlob,
-		Keys:      keys,
-		Transport: xfer,
+		Keyring:   keys,
+		Encrypted: true,
 	})
 	if err != nil {
 		return err
 	}
 
-	err = data.Download(uri.Path)
-	if err != nil {
-		return err
-	}
-
-	tmpCiphertext := filepath.Join(tmpDir, "ciphertext")
-	meta, err := data.Verify(tmpCiphertext)
-	if err != nil {
-		return err
-	}
-
-	if !meta.Encrypted {
-		return errors.Errorf("%s: not encrypted", getOpts.Output)
+	if getOpts.Output != "" {
+		log.Infof("successfully wrote sealed blob from %s to %s", uri, getOpts.Output)
 	}
 
 	if getOpts.Extract != "" {
-		tmpPlaintext := filepath.Join(tmpDir, "plaintext")
-		err := data.Decrypt(tmpCiphertext, tmpPlaintext, meta.Keys)
-		if err != nil {
-			return err
-		}
-
-		arch, err := archive.Open(tmpPlaintext)
+		arch, err := archive.NewReader(blobber)
 		if err != nil {
 			return err
 		}
@@ -194,16 +177,7 @@ func getRun(_ *cobra.Command, args []string) (err error) {
 			return err
 		}
 
-		log.Infof("successfully extracted sealed blob from %s to %s", uri, getOpts.Extract)
-	}
-
-	if getOpts.Output != "" {
-		err := iofs.MoveFile(tmpBlob, getOpts.Output)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("successfully wrote sealed blob from %s to %s", uri, getOpts.Output)
+		log.Infof("successfully extracted sealed blob to %s", getOpts.Extract)
 	}
 
 	return nil

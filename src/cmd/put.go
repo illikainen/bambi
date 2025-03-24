@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -104,32 +105,20 @@ func putRun(_ *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	xfer, err := transport.New(uri)
-	if err != nil {
-		return err
-	}
-	defer errorx.Defer(xfer.Close, &err)
-
-	data := &blob.Blob{}
-
 	if putOpts.Input != "" {
-		data, err = blob.New(blob.Config{
+		f, err := os.Open(putOpts.Input)
+		if err != nil {
+			return err
+		}
+		defer errorx.Defer(f.Close, &err)
+
+		err = blob.Upload(uri, f, &blob.Options{
 			Type:      metadata.Name(),
-			Path:      putOpts.Input,
-			Keys:      keys,
-			Transport: xfer,
+			Keyring:   keys,
+			Encrypted: true,
 		})
 		if err != nil {
 			return err
-		}
-
-		meta, err := data.Verify("")
-		if err != nil {
-			return err
-		}
-
-		if !meta.Encrypted {
-			return errors.Errorf("%s: not encrypted", putOpts.Input)
 		}
 	} else {
 		if len(args) < 2 {
@@ -142,56 +131,56 @@ func putRun(_ *cobra.Command, args []string) (err error) {
 		}
 		defer errorx.Defer(tmpClean, &err)
 
-		tmpArch := filepath.Join(tmpDir, "archive")
-		arch, err := archive.Create(tmpArch)
+		tmpFile, err := os.Create(filepath.Join(tmpDir, "archive")) // #nosec G304
 		if err != nil {
 			return err
 		}
+		defer errorx.Defer(tmpFile.Close, &err)
 
-		err = arch.AddAll(args[1:]...)
-		if err != nil {
-			return errorx.Join(err, arch.Close())
-		}
-
-		err = arch.Close()
-		if err != nil {
-			return err
-		}
-
-		data, err = blob.New(blob.Config{
+		blobber, err := blob.NewWriter(tmpFile, &blob.Options{
 			Type:      metadata.Name(),
-			Path:      filepath.Join(tmpDir, "blob"),
-			Keys:      keys,
-			Transport: xfer,
+			Keyring:   keys,
+			Encrypted: true,
 		})
 		if err != nil {
 			return err
 		}
+		defer errorx.Defer(blobber.Close, &err)
 
-		err = data.Import(tmpArch, nil)
+		arch, err := archive.NewWriter(blobber)
+		if err != nil {
+			return err
+		}
+		defer errorx.Defer(arch.Close, &err)
+
+		err = arch.AddAll(args[1:]...)
 		if err != nil {
 			return err
 		}
 
-		err = data.Encrypt()
+		err = blobber.Sign()
 		if err != nil {
 			return err
 		}
 
-		err = data.Sign()
+		err = tmpFile.Sync()
 		if err != nil {
 			return err
 		}
 
-		_, err = data.Verify("")
+		_, err = iofs.Seek(tmpFile, 0, io.SeekStart)
 		if err != nil {
 			return err
 		}
-	}
 
-	err = data.Upload(uri.Path)
-	if err != nil {
-		return err
+		err = blob.Upload(uri, tmpFile, &blob.Options{
+			Type:      metadata.Name(),
+			Keyring:   keys,
+			Encrypted: true,
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	log.Infof("successfully uploaded sealed blob to %s", uri)
