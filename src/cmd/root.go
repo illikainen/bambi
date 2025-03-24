@@ -8,14 +8,16 @@ import (
 	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-utils/src/flag"
-	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var rootOpts struct {
 	config    config.Config
+	profile   string
 	verbosity string
+	privKey   flag.Path
+	pubKeys   flag.PathSlice
 }
 
 var rootCmd = &cobra.Command{
@@ -44,17 +46,36 @@ func init() {
 	}
 
 	flags.Var(&rootOpts.config, "config", "Configuration file")
-
-	flags.StringVarP(
-		&rootOpts.verbosity,
-		"verbosity",
-		"",
-		"info",
-		fmt.Sprintf("Verbosity (%s)", strings.Join(levels, ", ")),
-	)
+	flags.StringVarP(&rootOpts.profile, "profile", "p", "", "Profile to use")
+	flags.StringVar(&rootOpts.verbosity, "verbosity", "info",
+		fmt.Sprintf("Verbosity (%s)", strings.Join(levels, ", ")))
+	flags.Var(&rootOpts.privKey, "privkey", "Private key file")
+	flags.Var(&rootOpts.pubKeys, "pubkeys", "Public key file(s)")
 }
 
-func rootPreRun(_ *cobra.Command, _ []string) error {
+func rootPreRun(cmd *cobra.Command, _ []string) error {
+	flags := cmd.Flags()
+	cfg := &rootOpts.config
+	pcfg := cfg.Profiles[rootOpts.profile]
+
+	configFile, err := config.ConfigFile()
+	if err != nil {
+		return err
+	}
+
+	if err := flag.SetFallback(flags, "config", configFile); err != nil {
+		return err
+	}
+	if err := flag.SetFallback(flags, "verbosity", pcfg.Verbosity, cfg.Verbosity); err != nil {
+		return err
+	}
+	if err := flag.SetFallback(flags, "privkey", pcfg.PrivKey, cfg.PrivKey); err != nil {
+		return err
+	}
+	if err := flag.SetFallback(flags, "pubkeys", pcfg.PubKeys, cfg.PubKeys); err != nil {
+		return err
+	}
+
 	level, err := log.ParseLevel(rootOpts.verbosity)
 	if err != nil {
 		return err
