@@ -113,7 +113,7 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 		return nil
 	}
 
-	keys, err := rootOpts.config.ReadKeyring()
+	keys, err := blob.ReadKeyring(rootOpts.privKey.String(), rootOpts.pubKeys.StringSlice())
 	if err != nil {
 		return err
 	}

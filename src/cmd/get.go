@@ -51,7 +51,7 @@ func getPreRun(_ *cobra.Command, _ []string) error {
 }
 
 func getRun(_ *cobra.Command, args []string) (err error) {
-	keys, err := rootOpts.config.ReadKeyring()
+	keys, err := blob.ReadKeyring(rootOpts.privKey.String(), rootOpts.pubKeys.StringSlice())
 	if err != nil {
 		return err
 	}

@@ -7,9 +7,6 @@ import (
 	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/BurntSushi/toml"
-	"github.com/illikainen/go-cryptor/src/asymmetric"
-	"github.com/illikainen/go-cryptor/src/blob"
-	"github.com/illikainen/go-cryptor/src/cryptor"
 	"github.com/illikainen/go-utils/src/iofs"
 	"github.com/illikainen/go-utils/src/stringx"
 	log "github.com/sirupsen/logrus"
@@ -50,36 +47,6 @@ func (c *Config) String() string {
 
 func (c *Config) Type() string {
 	return "config"
-}
-
-func (c *Config) ReadKeyring() (*blob.Keyring, error) {
-	pubKeys := []cryptor.PublicKey{}
-
-	for _, pubFile := range c.PubKeys {
-		path, err := expand(pubFile)
-		if err != nil {
-			return nil, err
-		}
-
-		pubKey, err := asymmetric.ReadPublicKey(path)
-		if err != nil {
-			return nil, err
-		}
-
-		pubKeys = append(pubKeys, pubKey)
-	}
-
-	path, err := expand(c.PrivKey)
-	if err != nil {
-		return nil, err
-	}
-
-	privKey, err := asymmetric.ReadPrivateKey(path)
-	if err != nil {
-		return nil, err
-	}
-
-	return &blob.Keyring{Public: pubKeys, Private: privKey}, nil
 }
 
 func (c *Config) SandboxPaths() (ro []string, rw []string, err error) {
