@@ -34,6 +34,10 @@ func (c *Config) Set(value string) error {
 
 	_, err := toml.DecodeFile(value, &c.Root)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Debugf("%s: skipping...", value)
+			return nil
+		}
 		return err
 	}
 
