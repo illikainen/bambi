@@ -14,7 +14,8 @@ import (
 )
 
 var rootOpts struct {
-	config    config.Config
+	configp   flag.Path
+	config    *config.Config
 	profile   string
 	verbosity logging.LogLevel
 	privKey   flag.Path
@@ -46,7 +47,7 @@ func init() {
 		levels = append(levels, level.String())
 	}
 
-	flags.Var(&rootOpts.config, "config", "Configuration file")
+	flags.Var(&rootOpts.configp, "config", "Configuration file")
 	flags.StringVarP(&rootOpts.profile, "profile", "p", "", "Profile to use")
 	flags.Var(&rootOpts.verbosity, "verbosity", fmt.Sprintf("Verbosity (%s)", strings.Join(levels, ", ")))
 	flags.Var(&rootOpts.privKey, "privkey", "Private key file")
@@ -54,18 +55,24 @@ func init() {
 }
 
 func rootPreRun(cmd *cobra.Command, _ []string) error {
-	flags := cmd.Flags()
-	cfg := &rootOpts.config
-	pcfg := cfg.Profiles[rootOpts.profile]
-
-	configFile, err := config.ConfigFile()
+	cfgPath, err := config.ConfigFile()
 	if err != nil {
 		return err
 	}
 
-	if err := flag.SetFallback(flags, "config", configFile); err != nil {
+	flags := cmd.Flags()
+	if err := flag.SetFallback(flags, "config", cfgPath); err != nil {
 		return err
 	}
+
+	rootOpts.config, err = config.Read(rootOpts.configp.Value)
+	if err != nil {
+		return err
+	}
+
+	cfg := rootOpts.config
+	pcfg := cfg.Profiles[rootOpts.profile]
+
 	if err := flag.SetFallback(flags, "verbosity", pcfg.Verbosity, cfg.Verbosity); err != nil {
 		return err
 	}

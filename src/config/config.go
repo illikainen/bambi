@@ -26,35 +26,23 @@ type Settings struct {
 
 type Config struct {
 	Root
-	Value string
+	Path string
 }
 
-func (c *Config) Set(value string) error {
-	log.Debugf("%s: reading config", value)
+func Read(path string) (*Config, error) {
+	log.Debugf("%s: reading config", path)
 
-	_, err := toml.DecodeFile(value, &c.Root)
+	c := &Config{Path: path}
+	_, err := toml.DecodeFile(path, &c.Root)
 	if err != nil {
-		if os.IsNotExist(err) {
-			log.Debugf("%s: skipping...", value)
-			return nil
-		}
-		return err
+		return nil, err
 	}
 
-	c.Value = value
-	return nil
-}
-
-func (c *Config) String() string {
-	return c.Value
-}
-
-func (c *Config) Type() string {
-	return "config"
+	return c, nil
 }
 
 func (c *Config) SandboxPaths() (ro []string, rw []string, err error) {
-	roOrig := []string{c.Value, c.PrivKey}
+	roOrig := []string{c.Path, c.PrivKey}
 	roOrig = append(roOrig, c.PubKeys...)
 
 	for _, path := range roOrig {
