@@ -7,8 +7,8 @@ import (
 	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-cryptor/src/blob"
-	"github.com/illikainen/go-cryptor/src/cryptor"
 	"github.com/illikainen/go-utils/src/errorx"
+	"github.com/illikainen/go-utils/src/flag"
 	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/pkg/errors"
@@ -18,7 +18,7 @@ import (
 )
 
 var sealOpts struct {
-	cryptor.EncryptOptions
+	output flag.Path
 }
 
 var sealCmd = &cobra.Command{
@@ -40,12 +40,10 @@ var sealCmd = &cobra.Command{
 }
 
 func init() {
-	flags := cryptor.EncryptFlags(cryptor.EncryptConfig{
-		Options: &sealOpts.EncryptOptions,
-	})
-	lo.Must0(flags.MarkHidden("input"))
+	flags := sealCmd.Flags()
 
-	sealCmd.Flags().AddFlagSet(flags)
+	sealOpts.output.State = flag.MustNotExist
+	flags.VarP(&sealOpts.output, "output", "o", "Output file for the sealed blob")
 	lo.Must0(sealCmd.MarkFlagRequired("output"))
 
 	rootCmd.AddCommand(sealCmd)
@@ -54,7 +52,7 @@ func init() {
 func sealRun(_ *cobra.Command, args []string) (err error) {
 	if sandbox.Compatible() && !sandbox.IsSandboxed() {
 		ro := []string{}
-		rw := []string{sealOpts.Output}
+		rw := []string{sealOpts.output.String()}
 
 		confRO, confRW, err := rootOpts.config.SandboxPaths()
 		if err != nil {
@@ -64,7 +62,7 @@ func sealRun(_ *cobra.Command, args []string) (err error) {
 		rw = append(rw, confRW...)
 
 		// Required to mount the file in the sandbox.
-		f, err := os.Create(sealOpts.Output)
+		f, err := os.Create(sealOpts.output.String())
 		if err != nil {
 			return err
 		}
@@ -89,7 +87,7 @@ func sealRun(_ *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	output, err := os.Create(sealOpts.Output)
+	output, err := os.Create(sealOpts.output.String())
 	if err != nil {
 		return err
 	}
@@ -116,6 +114,6 @@ func sealRun(_ *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	log.Infof("successfully wrote sealed blob to %s", sealOpts.Output)
+	log.Infof("successfully wrote sealed blob to %s", sealOpts.output.String())
 	return nil
 }

@@ -14,7 +14,7 @@ import (
 )
 
 var fingerprintOpts struct {
-	input   string
+	input   flag.Path
 	private bool
 }
 
@@ -27,23 +27,11 @@ var fingerprintCmd = &cobra.Command{
 func init() {
 	flags := fingerprintCmd.Flags()
 
-	flag.PathVarP(
-		flags,
-		&fingerprintOpts.input,
-		"input",
-		"i",
-		flag.Path{State: flag.MustExist},
-		"Key to fingerprint",
-	)
+	fingerprintOpts.input.State = flag.MustExist
+	flags.VarP(&fingerprintOpts.input, "input", "i", "Key to fingerprint")
 	lo.Must0(fingerprintCmd.MarkFlagRequired("input"))
 
-	flags.BoolVarP(
-		&fingerprintOpts.private,
-		"private",
-		"p",
-		false,
-		"Treat the key as a private key",
-	)
+	flags.BoolVarP(&fingerprintOpts.private, "private", "P", false, "Treat the key as a private key")
 
 	rootCmd.AddCommand(fingerprintCmd)
 }
@@ -52,7 +40,7 @@ func fingerprintRun(_ *cobra.Command, _ []string) error {
 	if sandbox.Compatible() && !sandbox.IsSandboxed() {
 		_, err := sandbox.Exec(sandbox.Options{
 			Command: os.Args,
-			RO:      []string{fingerprintOpts.input},
+			RO:      []string{fingerprintOpts.input.String()},
 			Stdout:  process.LogrusOutput,
 			Stderr:  process.LogrusOutput,
 		})
@@ -61,14 +49,14 @@ func fingerprintRun(_ *cobra.Command, _ []string) error {
 
 	fingerprint := ""
 	if fingerprintOpts.private {
-		key, err := asymmetric.ReadPrivateKey(fingerprintOpts.input)
+		key, err := asymmetric.ReadPrivateKey(fingerprintOpts.input.String())
 		if err != nil {
 			return err
 		}
 
 		fingerprint = key.Fingerprint()
 	} else {
-		key, err := asymmetric.ReadPublicKey(fingerprintOpts.input)
+		key, err := asymmetric.ReadPublicKey(fingerprintOpts.input.String())
 		if err != nil {
 			return err
 		}

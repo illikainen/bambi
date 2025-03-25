@@ -10,9 +10,9 @@ import (
 
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-netutils/src/sshx"
-	"github.com/illikainen/go-netutils/src/transport"
 	"github.com/illikainen/go-utils/src/cobrax"
 	"github.com/illikainen/go-utils/src/errorx"
+	"github.com/illikainen/go-utils/src/flag"
 	"github.com/illikainen/go-utils/src/iofs"
 	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
@@ -22,7 +22,8 @@ import (
 )
 
 var getOpts struct {
-	transport.DownloadOptions
+	output  flag.Path
+	extract flag.Path
 }
 
 var getCmd = &cobra.Command{
@@ -34,16 +35,19 @@ var getCmd = &cobra.Command{
 }
 
 func init() {
-	flags := transport.DownloadFlags(transport.DownloadConfig{
-		Options: &getOpts.DownloadOptions,
-	})
-	getCmd.Flags().AddFlagSet(flags)
+	flags := getCmd.Flags()
+
+	getOpts.output.State = flag.MustNotExist
+	flags.VarP(&getOpts.output, "output", "o", "Output file for the downloaded archive")
+
+	getOpts.extract.State = flag.MustNotExist
+	flags.VarP(&getOpts.extract, "extract", "e", "Extract the downloaded archive to this directory")
 
 	rootCmd.AddCommand(getCmd)
 }
 
 func getPreRun(_ *cobra.Command, _ []string) error {
-	if getOpts.Output == "" && getOpts.Extract == "" {
+	if getOpts.output.String() == "" && getOpts.extract.String() == "" {
 		return errors.Errorf("--output and/or --extract is required")
 	}
 
@@ -84,8 +88,8 @@ func getRun(_ *cobra.Command, args []string) (err error) {
 		}
 
 		// Required to mount the file in the sandbox.
-		if getOpts.Output != "" {
-			f, err := os.Create(getOpts.Output)
+		if getOpts.output.String() != "" {
+			f, err := os.Create(getOpts.output.String())
 			if err != nil {
 				return err
 			}
@@ -95,17 +99,17 @@ func getRun(_ *cobra.Command, args []string) (err error) {
 				return err
 			}
 
-			rw = append(rw, getOpts.Output)
+			rw = append(rw, getOpts.output.String())
 		}
 
 		// See ^
-		if getOpts.Extract != "" {
-			err := os.Mkdir(getOpts.Extract, 0700)
+		if getOpts.extract.String() != "" {
+			err := os.Mkdir(getOpts.extract.String(), 0700)
 			if err != nil {
 				return err
 			}
 
-			rw = append(rw, getOpts.Extract)
+			rw = append(rw, getOpts.extract.String())
 		}
 
 		_, err = sandbox.Exec(sandbox.Options{
@@ -118,13 +122,13 @@ func getRun(_ *cobra.Command, args []string) (err error) {
 		})
 		if err != nil {
 			var outErr error
-			if getOpts.Output != "" {
-				outErr = os.Remove(getOpts.Output)
+			if getOpts.output.String() != "" {
+				outErr = os.Remove(getOpts.output.String())
 			}
 
 			var extErr error
-			if getOpts.Extract != "" {
-				extErr = os.RemoveAll(getOpts.Extract)
+			if getOpts.extract.String() != "" {
+				extErr = os.RemoveAll(getOpts.extract.String())
 			}
 
 			return errorx.Join(err, outErr, extErr)
@@ -133,7 +137,7 @@ func getRun(_ *cobra.Command, args []string) (err error) {
 		return nil
 	}
 
-	output := getOpts.Output
+	output := getOpts.output.String()
 	if output == "" {
 		tmpDir, tmpClean, err := iofs.MkdirTemp()
 		if err != nil {
@@ -156,22 +160,22 @@ func getRun(_ *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	if getOpts.Output != "" {
-		log.Infof("successfully wrote sealed blob from %s to %s", uri, getOpts.Output)
+	if getOpts.output.String() != "" {
+		log.Infof("successfully wrote sealed blob from %s to %s", uri, getOpts.output.String())
 	}
 
-	if getOpts.Extract != "" {
+	if getOpts.extract.String() != "" {
 		arch, err := archive.NewReader(blobber)
 		if err != nil {
 			return err
 		}
 
-		err = arch.ExtractAll(getOpts.Extract)
+		err = arch.ExtractAll(getOpts.extract.String())
 		if err != nil {
 			return err
 		}
 
-		log.Infof("successfully extracted sealed blob to %s", getOpts.Extract)
+		log.Infof("successfully extracted sealed blob to %s", getOpts.extract.String())
 	}
 
 	return nil

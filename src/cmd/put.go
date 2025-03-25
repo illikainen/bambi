@@ -11,9 +11,9 @@ import (
 
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-netutils/src/sshx"
-	"github.com/illikainen/go-netutils/src/transport"
 	"github.com/illikainen/go-utils/src/cobrax"
 	"github.com/illikainen/go-utils/src/errorx"
+	"github.com/illikainen/go-utils/src/flag"
 	"github.com/illikainen/go-utils/src/iofs"
 	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
@@ -23,7 +23,7 @@ import (
 )
 
 var putOpts struct {
-	transport.UploadOptions
+	input flag.Path
 }
 
 var putCmd = &cobra.Command{
@@ -38,10 +38,10 @@ var putCmd = &cobra.Command{
 }
 
 func init() {
-	flags := transport.UploadFlags(transport.UploadConfig{
-		Options: &putOpts.UploadOptions,
-	})
-	putCmd.Flags().AddFlagSet(flags)
+	flags := putCmd.Flags()
+
+	putOpts.input.State = flag.MustExist
+	flags.VarP(&putOpts.input, "input", "i", "File to upload")
 
 	rootCmd.AddCommand(putCmd)
 }
@@ -58,7 +58,7 @@ func putRun(_ *cobra.Command, args []string) (err error) {
 	}
 
 	if sandbox.Compatible() && !sandbox.IsSandboxed() {
-		ro := []string{putOpts.Input}
+		ro := []string{putOpts.input.String()}
 		rw := []string{}
 
 		confRO, confRW, err := rootOpts.config.SandboxPaths()
@@ -99,8 +99,8 @@ func putRun(_ *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	if putOpts.Input != "" {
-		f, err := os.Open(putOpts.Input)
+	if putOpts.input.String() != "" {
+		f, err := os.Open(putOpts.input.String())
 		if err != nil {
 			return err
 		}

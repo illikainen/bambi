@@ -14,8 +14,8 @@ import (
 )
 
 var convertKeyOpts struct {
-	input   string
-	output  string
+	input   flag.Path
+	output  flag.Path
 	private bool
 }
 
@@ -29,33 +29,15 @@ var convertKeyCmd = &cobra.Command{
 func init() {
 	flags := convertKeyCmd.Flags()
 
-	flag.PathVarP(
-		flags,
-		&convertKeyOpts.input,
-		"input",
-		"i",
-		flag.Path{State: flag.MustExist},
-		"Key to fingerprint",
-	)
+	convertKeyOpts.input.State = flag.MustExist
+	flags.VarP(&convertKeyOpts.input, "input", "i", "Key to fingerprint")
 	lo.Must0(convertKeyCmd.MarkFlagRequired("input"))
 
-	flag.PathVarP(
-		flags,
-		&convertKeyOpts.output,
-		"output",
-		"o",
-		flag.Path{State: flag.MustNotExist},
-		"Output file for the converted key",
-	)
+	convertKeyOpts.output.State = flag.MustNotExist
+	flags.VarP(&convertKeyOpts.output, "output", "o", "Output file for the converted key")
 	lo.Must0(convertKeyCmd.MarkFlagRequired("output"))
 
-	flags.BoolVarP(
-		&convertKeyOpts.private,
-		"private",
-		"p",
-		false,
-		"Treat the key as a private key",
-	)
+	flags.BoolVarP(&convertKeyOpts.private, "private", "P", false, "Treat the key as a private key")
 
 	rootCmd.AddCommand(convertKeyCmd)
 }
@@ -63,7 +45,7 @@ func init() {
 func convertKeyRun(_ *cobra.Command, _ []string) (err error) {
 	if sandbox.Compatible() && !sandbox.IsSandboxed() {
 		// Required to mount the file in the sandbox.
-		f, err := os.Create(convertKeyOpts.output)
+		f, err := os.Create(convertKeyOpts.output.String())
 		if err != nil {
 			return err
 		}
@@ -75,8 +57,8 @@ func convertKeyRun(_ *cobra.Command, _ []string) (err error) {
 
 		_, err = sandbox.Exec(sandbox.Options{
 			Command: os.Args,
-			RO:      []string{convertKeyOpts.input},
-			RW:      []string{convertKeyOpts.output},
+			RO:      []string{convertKeyOpts.input.String()},
+			RW:      []string{convertKeyOpts.output.String()},
 			Stdout:  process.LogrusOutput,
 			Stderr:  process.LogrusOutput,
 		})
@@ -85,24 +67,24 @@ func convertKeyRun(_ *cobra.Command, _ []string) (err error) {
 
 	fingerprint := ""
 	if convertKeyOpts.private {
-		key, err := asymmetric.ReadPrivateKeyLegacy(convertKeyOpts.input)
+		key, err := asymmetric.ReadPrivateKeyLegacy(convertKeyOpts.input.String())
 		if err != nil {
 			return err
 		}
 
 		fingerprint = key.Fingerprint()
-		err = key.Write(convertKeyOpts.output)
+		err = key.Write(convertKeyOpts.output.String())
 		if err != nil {
 			return err
 		}
 	} else {
-		key, err := asymmetric.ReadPublicKeyLegacy(convertKeyOpts.input)
+		key, err := asymmetric.ReadPublicKeyLegacy(convertKeyOpts.input.String())
 		if err != nil {
 			return err
 		}
 
 		fingerprint = key.Fingerprint()
-		err = key.Write(convertKeyOpts.output)
+		err = key.Write(convertKeyOpts.output.String())
 		if err != nil {
 			return err
 		}

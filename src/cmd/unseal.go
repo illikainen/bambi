@@ -8,8 +8,8 @@ import (
 	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-cryptor/src/blob"
-	"github.com/illikainen/go-cryptor/src/cryptor"
 	"github.com/illikainen/go-utils/src/errorx"
+	"github.com/illikainen/go-utils/src/flag"
 	"github.com/illikainen/go-utils/src/iofs"
 	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
@@ -19,10 +19,12 @@ import (
 )
 
 var unsealOpts struct {
-	cryptor.DecryptOptions
+	input   flag.Path
+	output  flag.Path
+	extract flag.Path
 }
 
-var undealCmd = &cobra.Command{
+var unsealCmd = &cobra.Command{
 	Use:   "unseal",
 	Short: "Verify and decrypt an archive",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -35,18 +37,23 @@ var undealCmd = &cobra.Command{
 }
 
 func init() {
-	flags := cryptor.DecryptFlags(cryptor.DecryptConfig{
-		Options: &unsealOpts.DecryptOptions,
-	})
-	undealCmd.Flags().AddFlagSet(flags)
-	lo.Must0(undealCmd.MarkFlagRequired("input"))
+	flags := unsealCmd.Flags()
 
-	rootCmd.AddCommand(undealCmd)
+	unsealOpts.input.State = flag.MustExist
+	flags.VarP(&unsealOpts.input, "input", "i", "File to unseal")
+	lo.Must0(unsealCmd.MarkFlagRequired("input"))
+
+	unsealOpts.output.State = flag.MustNotExist
+	flags.VarP(&unsealOpts.output, "output", "o", "Output file for the unsealed blob")
+
+	flags.VarP(&unsealOpts.extract, "extract", "e", "Extract the unsealed blob to this directory")
+
+	rootCmd.AddCommand(unsealCmd)
 }
 
 func unsealRun(_ *cobra.Command, _ []string) (err error) {
 	if sandbox.Compatible() && !sandbox.IsSandboxed() {
-		ro := []string{unsealOpts.Input}
+		ro := []string{unsealOpts.input.String()}
 		rw := []string{}
 
 		confRO, confRW, err := rootOpts.config.SandboxPaths()
@@ -57,8 +64,8 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 		rw = append(rw, confRW...)
 
 		// Required to mount the file in the sandbox.
-		if unsealOpts.Output != "" {
-			f, err := os.Create(unsealOpts.Output)
+		if unsealOpts.output.String() != "" {
+			f, err := os.Create(unsealOpts.output.String())
 			if err != nil {
 				return err
 			}
@@ -68,26 +75,26 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 				return err
 			}
 
-			rw = append(rw, unsealOpts.Output)
+			rw = append(rw, unsealOpts.output.String())
 		}
 
 		// See ^
 		extractDirCreated := false
-		if unsealOpts.Extract != "" {
-			exists, err := iofs.Exists(unsealOpts.Extract)
+		if unsealOpts.extract.String() != "" {
+			exists, err := iofs.Exists(unsealOpts.extract.String())
 			if err != nil {
 				return err
 			}
 
 			if !exists {
-				err := os.Mkdir(unsealOpts.Extract, 0700)
+				err := os.Mkdir(unsealOpts.extract.String(), 0700)
 				if err != nil {
 					return err
 				}
 				extractDirCreated = true
 			}
 
-			rw = append(rw, unsealOpts.Extract)
+			rw = append(rw, unsealOpts.extract.String())
 		}
 
 		_, err = sandbox.Exec(sandbox.Options{
@@ -99,13 +106,13 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 		})
 		if err != nil {
 			var outErr error
-			if unsealOpts.Output != "" {
-				outErr = os.Remove(unsealOpts.Output)
+			if unsealOpts.output.String() != "" {
+				outErr = os.Remove(unsealOpts.output.String())
 			}
 
 			var extErr error
-			if unsealOpts.Extract != "" && extractDirCreated {
-				extErr = os.RemoveAll(unsealOpts.Extract)
+			if unsealOpts.extract.String() != "" && extractDirCreated {
+				extErr = os.RemoveAll(unsealOpts.extract.String())
 			}
 
 			return errorx.Join(err, outErr, extErr)
@@ -118,7 +125,7 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 		return err
 	}
 
-	f, err := os.Open(unsealOpts.Input)
+	f, err := os.Open(unsealOpts.input.String())
 	if err != nil {
 		return err
 	}
@@ -133,23 +140,23 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 		return err
 	}
 
-	if unsealOpts.Extract != "" {
+	if unsealOpts.extract.String() != "" {
 		arch, err := archive.NewReader(blobber)
 		if err != nil {
 			return err
 		}
 		defer errorx.Defer(arch.Close, &err)
 
-		err = arch.ExtractAll(unsealOpts.Extract)
+		err = arch.ExtractAll(unsealOpts.extract.String())
 		if err != nil {
 			return err
 		}
 
-		log.Infof("successfully extracted unsealed blob to %s", unsealOpts.Extract)
+		log.Infof("successfully extracted unsealed blob to %s", unsealOpts.extract)
 	}
 
-	if unsealOpts.Output != "" {
-		outf, err := os.Create(unsealOpts.Output)
+	if unsealOpts.output.String() != "" {
+		outf, err := os.Create(unsealOpts.output.String())
 		if err != nil {
 			return err
 		}
@@ -160,7 +167,7 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 			return err
 		}
 
-		log.Infof("successfully wrote unsealed blob to %s", unsealOpts.Output)
+		log.Infof("successfully wrote unsealed blob to %s", unsealOpts.output)
 	}
 
 	return nil
