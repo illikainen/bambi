@@ -1,13 +1,9 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/illikainen/go-cryptor/src/asymmetric"
 	"github.com/illikainen/go-utils/src/cobrax"
 	"github.com/illikainen/go-utils/src/flag"
-	"github.com/illikainen/go-utils/src/process"
-	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -37,16 +33,6 @@ func init() {
 }
 
 func fingerprintRun(_ *cobra.Command, _ []string) error {
-	if sandbox.Compatible() && !sandbox.IsSandboxed() {
-		_, err := sandbox.Exec(sandbox.Options{
-			Command: os.Args,
-			RO:      []string{fingerprintOpts.input.String()},
-			Stdout:  process.LogrusOutput,
-			Stderr:  process.LogrusOutput,
-		})
-		return err
-	}
-
 	fingerprint := ""
 	if fingerprintOpts.private {
 		key, err := asymmetric.ReadPrivateKey(fingerprintOpts.input.String())
@@ -64,6 +50,6 @@ func fingerprintRun(_ *cobra.Command, _ []string) error {
 		fingerprint = key.Fingerprint()
 	}
 
-	log.Infof("fingerprint for %s is %s", fingerprintOpts.input, fingerprint)
+	log.Infof("fingerprint for %s is %s", fingerprintOpts.input.String(), fingerprint)
 	return nil
 }
