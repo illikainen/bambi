@@ -1,182 +1,90 @@
 package cmd
 
 import (
-	"io"
-	"net/url"
 	"os"
-	"path/filepath"
 
-	"github.com/illikainen/bambi/src/archive"
 	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-cryptor/src/blob"
-	"github.com/illikainen/go-netutils/src/sshx"
 	"github.com/illikainen/go-utils/src/cobrax"
 	"github.com/illikainen/go-utils/src/errorx"
 	"github.com/illikainen/go-utils/src/flag"
-	"github.com/illikainen/go-utils/src/iofs"
-	"github.com/illikainen/go-utils/src/process"
-	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/pkg/errors"
+	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var putOpts struct {
+	url   flag.URL
 	input flag.Path
 }
 
 var putCmd = &cobra.Command{
-	Use: "put [flags] <url> [<file>...]",
-	Long: "Upload a signed and encrypted archive.\n\n" +
-		"If a file is provided with -i, the file is verified as a signed and\n" +
-		"encrypted archive before being uploaded to <url>.  Otherwise, an\n" +
-		"arbitrary number of files must be provided after <url>.  The files are\n" +
-		"written to a signed and encrypted archive before being uploaded to to <url>.\n",
+	Use:   "put [flags] <url> <file>",
+	Short: "Upload a sealed archive",
+	Long: "Upload a sealed archive.\n\n" +
+		"The file provided after <url> is verified as a signed and encrypted archive\n" +
+		"before uploading it to <url>.\n",
 	Run:  cobrax.Run(putRun),
-	Args: cobrax.ValidateArgsLength(1, -1),
+	Args: putArgs,
 }
 
 func init() {
 	flags := putCmd.Flags()
 
+	flags.Var(&putOpts.url, "url", "URL to upload")
+	lo.Must0(flags.MarkHidden("url"))
+
 	putOpts.input.State = flag.MustExist
 	flags.VarP(&putOpts.input, "input", "i", "File to upload")
+	lo.Must0(flags.MarkHidden("input"))
 
 	rootCmd.AddCommand(putCmd)
 }
 
-func putRun(_ *cobra.Command, args []string) (err error) {
+func putArgs(cmd *cobra.Command, args []string) error {
+	if len(args) != 2 {
+		return errors.Errorf("no URL and/or file provided")
+	}
+
+	flags := cmd.Flags()
+	uri := flags.Lookup("url")
+	err := uri.Value.Set(args[0])
+	if err != nil {
+		return err
+	}
+
+	input := flags.Lookup("input")
+	err = input.Value.Set(args[1])
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func putRun(_ *cobra.Command, _ []string) error {
 	keys, err := blob.ReadKeyring(rootOpts.privKey.String(), rootOpts.pubKeys.StringSlice())
 	if err != nil {
 		return err
 	}
 
-	uri, err := url.Parse(args[0])
+	f, err := os.Open(putOpts.input.String())
+	if err != nil {
+		return err
+	}
+	defer errorx.Defer(f.Close, &err)
+
+	err = blob.Upload(putOpts.url.Value, f, &blob.Options{
+		Type:      metadata.Name(),
+		Keyring:   keys,
+		Encrypted: true,
+	})
 	if err != nil {
 		return err
 	}
 
-	if sandbox.Compatible() && !sandbox.IsSandboxed() {
-		ro := []string{putOpts.input.String()}
-		rw := []string{}
-
-		confRO, confRW, err := rootOpts.config.SandboxPaths()
-		if err != nil {
-			return err
-		}
-		ro = append(ro, confRO...)
-		rw = append(rw, confRW...)
-
-		sshRO, sshRW, err := sshx.SandboxPaths()
-		if err != nil {
-			return err
-		}
-		ro = append(ro, sshRO...)
-		rw = append(rw, sshRW...)
-
-		if uri.Scheme == "file" {
-			f, err := os.Create(uri.Path)
-			if err != nil {
-				return err
-			}
-
-			err = f.Close()
-			if err != nil {
-				return err
-			}
-
-			rw = append(rw, uri.Path)
-		}
-		_, err = sandbox.Exec(sandbox.Options{
-			Command: os.Args,
-			RO:      ro,
-			RW:      append(rw, args[1:]...),
-			Share:   sandbox.ShareNet,
-			Stdout:  process.LogrusOutput,
-			Stderr:  process.LogrusOutput,
-		})
-		return err
-	}
-
-	if putOpts.input.String() != "" {
-		f, err := os.Open(putOpts.input.String())
-		if err != nil {
-			return err
-		}
-		defer errorx.Defer(f.Close, &err)
-
-		err = blob.Upload(uri, f, &blob.Options{
-			Type:      metadata.Name(),
-			Keyring:   keys,
-			Encrypted: true,
-		})
-		if err != nil {
-			return err
-		}
-	} else {
-		if len(args) < 2 {
-			return errors.Errorf("no file(s) provided")
-		}
-
-		tmpDir, tmpClean, err := iofs.MkdirTemp()
-		if err != nil {
-			return err
-		}
-		defer errorx.Defer(tmpClean, &err)
-
-		tmpFile, err := os.Create(filepath.Join(tmpDir, "archive")) // #nosec G304
-		if err != nil {
-			return err
-		}
-		defer errorx.Defer(tmpFile.Close, &err)
-
-		blobber, err := blob.NewWriter(tmpFile, &blob.Options{
-			Type:      metadata.Name(),
-			Keyring:   keys,
-			Encrypted: true,
-		})
-		if err != nil {
-			return err
-		}
-		defer errorx.Defer(blobber.Close, &err)
-
-		arch, err := archive.NewWriter(blobber)
-		if err != nil {
-			return err
-		}
-		defer errorx.Defer(arch.Close, &err)
-
-		err = arch.AddAll(args[1:]...)
-		if err != nil {
-			return err
-		}
-
-		err = blobber.Sign()
-		if err != nil {
-			return err
-		}
-
-		err = tmpFile.Sync()
-		if err != nil {
-			return err
-		}
-
-		_, err = iofs.Seek(tmpFile, 0, io.SeekStart)
-		if err != nil {
-			return err
-		}
-
-		err = blob.Upload(uri, tmpFile, &blob.Options{
-			Type:      metadata.Name(),
-			Keyring:   keys,
-			Encrypted: true,
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	log.Infof("successfully uploaded sealed blob to %s", uri)
+	log.Infof("successfully uploaded sealed blob to %s", putOpts.url.Value)
 	return nil
 }
