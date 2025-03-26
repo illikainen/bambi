@@ -59,7 +59,9 @@ func init() {
 	flags.StringVarP(&rootOpts.profile, "profile", "p", "", "Profile to use")
 	flags.Var(&rootOpts.verbosity, "verbosity", fmt.Sprintf("Verbosity (%s)", strings.Join(levels, ", ")))
 	flags.Var(&rootOpts.privKey, "privkey", "Private key file")
+	lo.Must0(flags.MarkHidden("privkey"))
 	flags.Var(&rootOpts.pubKeys, "pubkeys", "Public key file(s)")
+	lo.Must0(flags.MarkHidden("pubkeys"))
 }
 
 func rootPreRun(cmd *cobra.Command, _ []string) error {
