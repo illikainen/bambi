@@ -32,6 +32,7 @@ func init() {
 	flags := genkeyCmd.Flags()
 
 	genkeyOpts.output.State = flag.MustNotExist
+	genkeyOpts.output.Mode = flag.ReadWriteMode
 	genkeyOpts.output.Suffixes = []string{"pub", "priv"}
 	flags.VarP(&genkeyOpts.output, "output", "o",
 		"Write the generated keypair to <output>.pub and <output>.priv")
