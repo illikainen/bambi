@@ -7,8 +7,6 @@ import (
 	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/BurntSushi/toml"
-	"github.com/illikainen/go-utils/src/iofs"
-	"github.com/illikainen/go-utils/src/stringx"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -39,36 +37,6 @@ func Read(path string) (*Config, error) {
 	}
 
 	return c, nil
-}
-
-func (c *Config) SandboxPaths() (ro []string, rw []string, err error) {
-	roOrig := []string{c.Path, c.PrivKey}
-	roOrig = append(roOrig, c.PubKeys...)
-
-	for _, path := range roOrig {
-		realPath, err := expand(path)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		ro = append(ro, realPath)
-	}
-
-	return ro, nil, err
-}
-
-func expand(path string) (string, error) {
-	intPath, err := stringx.Interpolate(path)
-	if err != nil {
-		return "", err
-	}
-
-	realPath, err := iofs.Expand(intPath)
-	if err != nil {
-		return "", err
-	}
-
-	return realPath, nil
 }
 
 func ConfigDir() (string, error) {
