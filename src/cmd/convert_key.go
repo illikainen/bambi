@@ -1,13 +1,9 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/illikainen/go-cryptor/src/asymmetric"
 	"github.com/illikainen/go-utils/src/cobrax"
 	"github.com/illikainen/go-utils/src/flag"
-	"github.com/illikainen/go-utils/src/process"
-	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -34,6 +30,7 @@ func init() {
 	lo.Must0(convertKeyCmd.MarkFlagRequired("input"))
 
 	convertKeyOpts.output.State = flag.MustNotExist
+	convertKeyOpts.output.Mode = flag.ReadWriteMode
 	flags.VarP(&convertKeyOpts.output, "output", "o", "Output file for the converted key")
 	lo.Must0(convertKeyCmd.MarkFlagRequired("output"))
 
@@ -43,28 +40,6 @@ func init() {
 }
 
 func convertKeyRun(_ *cobra.Command, _ []string) (err error) {
-	if sandbox.Compatible() && !sandbox.IsSandboxed() {
-		// Required to mount the file in the sandbox.
-		f, err := os.Create(convertKeyOpts.output.String())
-		if err != nil {
-			return err
-		}
-
-		err = f.Close()
-		if err != nil {
-			return err
-		}
-
-		_, err = sandbox.Exec(sandbox.Options{
-			Command: os.Args,
-			RO:      []string{convertKeyOpts.input.String()},
-			RW:      []string{convertKeyOpts.output.String()},
-			Stdout:  process.LogrusOutput,
-			Stderr:  process.LogrusOutput,
-		})
-		return err
-	}
-
 	fingerprint := ""
 	if convertKeyOpts.private {
 		key, err := asymmetric.ReadPrivateKeyLegacy(convertKeyOpts.input.String())
@@ -91,6 +66,7 @@ func convertKeyRun(_ *cobra.Command, _ []string) (err error) {
 	}
 
 	log.Infof("fingerprint: %s", fingerprint)
-	log.Infof("successfully converted %s to %s", convertKeyOpts.input, convertKeyOpts.output)
+	log.Infof("successfully converted %s to %s", convertKeyOpts.input.String(),
+		convertKeyOpts.output.String())
 	return nil
 }
