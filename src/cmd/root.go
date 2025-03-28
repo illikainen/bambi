@@ -49,6 +49,7 @@ func init() {
 		levels = append(levels, level.String())
 	}
 
+	rootOpts.configp.State = flag.MustExist
 	flags.Var(&rootOpts.configp, "config", "Configuration file")
 	flags.StringVarP(&rootOpts.profile, "profile", "p", "", "Profile to use")
 	flags.Var(&rootOpts.verbosity, "verbosity", fmt.Sprintf("Verbosity (%s)", strings.Join(levels, ", ")))
