@@ -16,8 +16,9 @@ import (
 )
 
 var putOpts struct {
-	url   flag.URL
-	input flag.Path
+	url        flag.URL
+	input      flag.Path
+	signedOnly bool
 }
 
 var putCmd = &cobra.Command{
@@ -39,6 +40,9 @@ func init() {
 	putOpts.input.State = flag.MustExist
 	flags.VarP(&putOpts.input, "input", "i", "File to upload")
 	lo.Must0(flags.MarkHidden("input"))
+
+	flags.BoolVarP(&putOpts.signedOnly, "signed-only", "s", false,
+		"Required if the archive is signed but not encrypted")
 
 	rootCmd.AddCommand(putCmd)
 }
@@ -79,7 +83,7 @@ func putRun(_ *cobra.Command, _ []string) error {
 	err = blob.Upload(putOpts.url.Value, f, &blob.Options{
 		Type:      metadata.Name(),
 		Keyring:   keys,
-		Encrypted: true,
+		Encrypted: !putOpts.signedOnly,
 	})
 	if err != nil {
 		return err
