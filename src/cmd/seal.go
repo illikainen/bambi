@@ -38,7 +38,7 @@ func init() {
 	flags := sealCmd.Flags()
 
 	sealOpts.input.State = flag.MustExist
-	flags.VarP(&sealOpts.input, "input", "i", "Input file(s) to seal")
+	flags.VarP(&sealOpts.input, "input", "i", "Input file to seal")
 	lo.Must0(flags.MarkHidden("input"))
 
 	sealOpts.output.State = flag.MustNotExist
