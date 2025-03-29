@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"io"
 	"os"
 
 	"github.com/illikainen/bambi/src/archive"
@@ -16,9 +15,8 @@ import (
 )
 
 var unsealOpts struct {
-	input   flag.Path
-	output  flag.Path
-	extract flag.Path
+	input  flag.Path
+	output flag.Path
 }
 
 var unsealCmd = &cobra.Command{
@@ -40,13 +38,10 @@ func init() {
 	flags.VarP(&unsealOpts.input, "input", "i", "File to unseal")
 	lo.Must0(unsealCmd.MarkFlagRequired("input"))
 
-	unsealOpts.output.State = flag.MustNotExist
+	unsealOpts.output.State = flag.MustBeDir
 	unsealOpts.output.Mode = flag.ReadWriteMode
 	flags.VarP(&unsealOpts.output, "output", "o", "Output file for the unsealed blob")
-
-	unsealOpts.extract.State = flag.MustBeDir
-	unsealOpts.extract.Mode = flag.ReadWriteMode
-	flags.VarP(&unsealOpts.extract, "extract", "e", "Extract the unsealed blob to this directory")
+	lo.Must0(unsealCmd.MarkFlagRequired("output"))
 
 	rootCmd.AddCommand(unsealCmd)
 }
@@ -72,35 +67,18 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 		return err
 	}
 
-	if unsealOpts.extract.String() != "" {
-		arch, err := archive.NewReader(blobber)
-		if err != nil {
-			return err
-		}
-		defer errorx.Defer(arch.Close, &err)
+	arch, err := archive.NewReader(blobber)
+	if err != nil {
+		return err
+	}
+	defer errorx.Defer(arch.Close, &err)
 
-		err = arch.ExtractAll(unsealOpts.extract.String())
-		if err != nil {
-			return err
-		}
-
-		log.Infof("successfully extracted unsealed blob to %s", unsealOpts.extract.String())
+	err = arch.ExtractAll(unsealOpts.output.String())
+	if err != nil {
+		return err
 	}
 
-	if unsealOpts.output.String() != "" {
-		outf, err := os.Create(unsealOpts.output.String())
-		if err != nil {
-			return err
-		}
-		defer errorx.Defer(outf.Close, &err)
-
-		_, err = io.Copy(outf, blobber)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("successfully wrote unsealed blob to %s", unsealOpts.output.String())
-	}
+	log.Infof("successfully wrote unsealed blob to %s", unsealOpts.output.String())
 
 	return nil
 }
