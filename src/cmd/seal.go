@@ -16,8 +16,9 @@ import (
 )
 
 var sealOpts struct {
-	input  flag.PathSlice
-	output flag.Path
+	input      flag.PathSlice
+	output     flag.Path
+	signedOnly bool
 }
 
 var sealCmd = &cobra.Command{
@@ -44,6 +45,9 @@ func init() {
 	sealOpts.output.Mode = flag.ReadWriteMode
 	flags.VarP(&sealOpts.output, "output", "o", "Output file for the sealed blob")
 	lo.Must0(sealCmd.MarkFlagRequired("output"))
+
+	flags.BoolVarP(&sealOpts.signedOnly, "signed-only", "s", false,
+		"Only sign the archive, don't encrypt it")
 
 	rootCmd.AddCommand(sealCmd)
 }
@@ -80,7 +84,7 @@ func sealRun(_ *cobra.Command, args []string) (err error) {
 	blobber, err := blob.NewWriter(output, &blob.Options{
 		Type:      metadata.Name(),
 		Keyring:   keys,
-		Encrypted: true,
+		Encrypted: !sealOpts.signedOnly,
 	})
 	if err != nil {
 		return err
