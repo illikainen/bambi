@@ -17,8 +17,9 @@ import (
 )
 
 var metadataOpts struct {
-	input  flag.Path
-	output flag.Path
+	input      flag.Path
+	output     flag.Path
+	signedOnly bool
 }
 
 var metadataCmd = &cobra.Command{
@@ -39,6 +40,9 @@ func init() {
 	metadataOpts.output.Mode = flag.ReadWriteMode
 	flags.VarP(&metadataOpts.output, "output", "o", "Output file for the verified blob")
 
+	flags.BoolVarP(&metadataOpts.signedOnly, "signed-only", "s", false,
+		"Required if the archive is signed but not encrypted")
+
 	rootCmd.AddCommand(metadataCmd)
 }
 
@@ -57,7 +61,7 @@ func metadataRun(_ *cobra.Command, _ []string) (err error) {
 	blobber, err := blob.NewReader(f, &blob.Options{
 		Type:      metadata.Name(),
 		Keyring:   keys,
-		Encrypted: true,
+		Encrypted: !metadataOpts.signedOnly,
 	})
 	if err != nil {
 		return err
