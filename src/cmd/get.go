@@ -16,8 +16,9 @@ import (
 )
 
 var getOpts struct {
-	url    flag.URL
-	output flag.Path
+	url        flag.URL
+	output     flag.Path
+	signedOnly bool
 }
 
 var getCmd = &cobra.Command{
@@ -37,6 +38,9 @@ func init() {
 	getOpts.output.Mode = flag.ReadWriteMode
 	flags.VarP(&getOpts.output, "output", "o", "Output file for the downloaded archive")
 	lo.Must0(getCmd.MarkFlagRequired("output"))
+
+	flags.BoolVarP(&getOpts.signedOnly, "signed-only", "s", false,
+		"Required if the archive is signed but not encrypted")
 
 	rootCmd.AddCommand(getCmd)
 }
@@ -68,7 +72,7 @@ func getRun(_ *cobra.Command, _ []string) (err error) {
 	_, err = blob.Download(getOpts.url.Value, f, &blob.Options{
 		Type:      metadata.Name(),
 		Keyring:   keys,
-		Encrypted: true,
+		Encrypted: !getOpts.signedOnly,
 	})
 	if err != nil {
 		return err
