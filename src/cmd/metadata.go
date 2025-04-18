@@ -67,7 +67,7 @@ func metadataRun(_ *cobra.Command, _ []string) (err error) {
 		return err
 	}
 
-	meta, err := json.MarshalIndent(blobber.Metadata(), "", "    ")
+	meta, err := json.MarshalIndent(blobber.Metadata, "", "    ")
 	if err != nil {
 		return err
 	}
