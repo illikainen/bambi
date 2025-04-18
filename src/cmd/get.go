@@ -69,7 +69,7 @@ func getRun(_ *cobra.Command, _ []string) (err error) {
 	f, err := os.OpenFile(getOpts.output.String(), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // #nosec G304
 	defer errorx.Defer(f.Close, &err)
 
-	_, err = blob.Download(getOpts.url.Value, f, &blob.Options{
+	blobber, err := blob.Download(getOpts.url.Value, f, &blob.Options{
 		Type:      metadata.Name(),
 		Keyring:   keys,
 		Encrypted: !getOpts.signedOnly,
@@ -78,6 +78,10 @@ func getRun(_ *cobra.Command, _ []string) (err error) {
 		return err
 	}
 
+	log.Infof("signed by: %s", blobber.Signer)
+	log.Infof("sha2-256: %s", blobber.Metadata.Hashes.SHA256)
+	log.Infof("sha3-512: %s", blobber.Metadata.Hashes.KECCAK512)
+	log.Infof("blake2b-512: %s", blobber.Metadata.Hashes.BLAKE2b512)
 	log.Infof("successfully wrote sealed blob from %s to %s", getOpts.url.Value, getOpts.output.String())
 	return nil
 }

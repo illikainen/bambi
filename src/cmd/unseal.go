@@ -70,6 +70,10 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 	if err != nil {
 		return err
 	}
+	log.Infof("signed by: %s", blobber.Signer)
+	log.Infof("sha2-256: %s", blobber.Metadata.Hashes.SHA256)
+	log.Infof("sha3-512: %s", blobber.Metadata.Hashes.KECCAK512)
+	log.Infof("blake2b-512: %s", blobber.Metadata.Hashes.BLAKE2b512)
 
 	arch, err := archive.NewReader(blobber)
 	if err != nil {
