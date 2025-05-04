@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/illikainen/go-utils/src/errorx"
 	"github.com/illikainen/go-utils/src/iofs"
 	"github.com/illikainen/go-utils/src/stringx"
 	"github.com/pkg/errors"
@@ -117,7 +118,7 @@ func (r *ArchiveReader) ExtractAll(basedir string) (err error) {
 
 			err = iofs.Copy(f, r.tar)
 			if err != nil {
-				return err
+				return errorx.Join(err, f.Close())
 			}
 
 			err = f.Close()
