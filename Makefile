@@ -35,7 +35,8 @@ export GOPROXY := off
 export REAL_GOPROXY := $(shell go env GOPROXY)
 
 # Unfortunately there is no Go-specific way of pinning the CA for GOPROXY.
-export SSL_CERT_FILE := /etc/ssl/certs/GTS_Root_R1.pem
+# The go.pem file is created by the `pin` target in this Makefile.
+export SSL_CERT_FILE := ./go.pem
 export SSL_CERT_DIR := /path/does/not/exist/to/pin/ca
 
 export PATH := $(OUTPUT_TOOLS):$(PATH)
@@ -166,6 +167,8 @@ fix: verify fix-fmt fix-imports
 pin:
 	@$(SANDBOX) echo "$$PIN_EXPLANATION" > go.pin
 	@$(SANDBOX) sha256sum go.sum go.mod tools/go.sum tools/go.mod >> go.pin
+	@test -f /etc/ssl/certs/GTS_Root_R1.pem && test -f /etc/ssl/certs/GTS_Root_R4.pem && \
+		cat /etc/ssl/certs/GTS_Root_R1.pem /etc/ssl/certs/GTS_Root_R4.pem > go.pem || true
 
 verify:
 	@$(SANDBOX) sha256sum --strict --check go.pin
