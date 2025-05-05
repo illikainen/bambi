@@ -5,9 +5,9 @@ go 1.19
 require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/fatih/color v1.15.0
-	github.com/illikainen/go-cryptor v0.0.0
-	github.com/illikainen/go-netutils v0.0.0
-	github.com/illikainen/go-utils v0.0.0
+	github.com/illikainen/go-cryptor v0.0.0-20250505122540-fd5a2321b8f5
+	github.com/illikainen/go-netutils v0.0.0-20250505122326-0e2700986716
+	github.com/illikainen/go-utils v0.0.0-20250505121911-a2d2eb85064b
 	github.com/mattn/go-isatty v0.0.17
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.37.0
@@ -28,9 +28,3 @@ require (
 	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/term v0.15.0 // indirect
 )
-
-replace github.com/illikainen/go-cryptor => ../go-cryptor
-
-replace github.com/illikainen/go-netutils => ../go-netutils
-
-replace github.com/illikainen/go-utils => ../go-utils

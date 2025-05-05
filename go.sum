@@ -6,6 +6,12 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/fatih/color v1.15.0 h1:kOqh6YHBtK8aywxGerMG2Eq3H6Qgoqeo13Bk2Mv/nBs=
 github.com/fatih/color v1.15.0/go.mod h1:0h5ZqXfHYED7Bhv2ZJamyIOUej9KtShiJESRwBDUSsw=
+github.com/illikainen/go-cryptor v0.0.0-20250505122540-fd5a2321b8f5 h1:p1BzIYtKzLpbTqOPP3j9U5k3Oeqeal8xEHslJf9K7oI=
+github.com/illikainen/go-cryptor v0.0.0-20250505122540-fd5a2321b8f5/go.mod h1:cpgQejcGiXb2WmL7dLT419cp29kCu3xN1TzqxXDT7Ds=
+github.com/illikainen/go-netutils v0.0.0-20250505122326-0e2700986716 h1:6b+oJ2F+IFO3tuhLrTbjT0Vicp/u+q7fcqRyo3ssoEI=
+github.com/illikainen/go-netutils v0.0.0-20250505122326-0e2700986716/go.mod h1:NC/Hlw20lMczESnDDW7JNyDuA3GPSimTrVFE76r0E8c=
+github.com/illikainen/go-utils v0.0.0-20250505121911-a2d2eb85064b h1:ChJnMjNmQAcD6Aoii/idoDeMxj6NtaQSNccoTd5Njo0=
+github.com/illikainen/go-utils v0.0.0-20250505121911-a2d2eb85064b/go.mod h1:VmDx9pk02aLjhoJ2/fknXBvH+UwNIxA77W/fcdnb5AU=
 github.com/inconshreveable/mousetrap v1.0.1 h1:U3uMjPSQEBMNp1lFxmllqCPM6P5u/Xq7Pgzkat/bFNc=
 github.com/inconshreveable/mousetrap v1.0.1/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/kevinburke/ssh_config v1.2.0 h1:x584FjTGwHzMwvHx18PXxbBVzfnxogHaAReU4gf13a4=
