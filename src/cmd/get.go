@@ -67,6 +67,9 @@ func getRun(_ *cobra.Command, _ []string) (err error) {
 	}
 
 	f, err := os.OpenFile(getOpts.output.String(), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) // #nosec G304
+	if err != nil {
+		return err
+	}
 	defer errorx.Defer(f.Close, &err)
 
 	blobber, err := blob.Download(getOpts.url.Value, f, &blob.Options{
