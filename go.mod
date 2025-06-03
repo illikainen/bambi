@@ -3,6 +3,7 @@ module github.com/illikainen/bambi
 go 1.19
 
 require (
+	dario.cat/mergo v1.0.1
 	github.com/BurntSushi/toml v1.3.2
 	github.com/fatih/color v1.15.0
 	github.com/illikainen/go-cryptor v0.0.0-20250505122540-fd5a2321b8f5

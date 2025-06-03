@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/illikainen/bambi/src/config"
@@ -11,21 +10,16 @@ import (
 
 	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
-	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var rootOpts struct {
-	configp   string
-	config    *config.Config
-	profile   string
-	verbosity string
-	privKey   string
-	pubKeys   []string
-	sandbox   string
-	Sandbox   sandbox.Sandbox
+	config.Config
+	config  string
+	Sandbox sandbox.Sandbox
+	sandbox string
 }
 
 var rootCmd = &cobra.Command{
@@ -53,41 +47,30 @@ func init() {
 		levels = append(levels, level.String())
 	}
 
-	flags.StringVarP(&rootOpts.configp, "config", "", lo.Must1(config.ConfigFile()), "Configuration file")
-	flags.StringVarP(&rootOpts.profile, "profile", "p", "", "Profile to use")
-	flags.StringVarP(&rootOpts.verbosity, "verbosity", "V", "info",
+	flags.StringVarP(&rootOpts.config, "config", "", lo.Must1(config.ConfigFile()), "Configuration file")
+	flags.StringVarP(&rootOpts.Profile, "profile", "p", "", "Profile to use")
+	flags.StringVarP(&rootOpts.Verbosity, "verbosity", "V", "",
 		fmt.Sprintf("Verbosity (%s)", strings.Join(levels, ", ")))
-	flags.StringVarP(&rootOpts.privKey, "privkey", "", "", "Private key file")
-	flags.StringSliceVarP(&rootOpts.pubKeys, "pubkeys", "", nil, "Public key file(s)")
+	flags.StringVarP(&rootOpts.PrivKey, "privkey", "", "", "Private key file")
+	flags.StringSliceVarP(&rootOpts.PubKeys, "pubkeys", "", nil, "Public key file(s)")
 	flags.StringVarP(&rootOpts.sandbox, "sandbox", "", "", "Sandbox backend")
 }
 
 func rootPreRun(_ *cobra.Command, _ []string) error {
-	cfg, err := config.Read(rootOpts.configp)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	cfg, err := config.Read(rootOpts.config, &rootOpts.Config)
+	if err != nil {
 		return err
 	}
-	rootOpts.config = cfg
+	rootOpts.Config = *cfg
 
-	verbosity := rootOpts.verbosity
-	if cfg.Verbosity != "" {
-		verbosity = cfg.Verbosity
-	}
-	level, err := log.ParseLevel(verbosity)
+	level, err := log.ParseLevel(rootOpts.Verbosity)
 	if err != nil {
 		return err
 	}
 	log.SetLevel(level)
 
-	if rootOpts.privKey == "" {
-		rootOpts.privKey = cfg.PrivKey
-	}
-
-	if len(rootOpts.pubKeys) == 0 {
-		rootOpts.pubKeys = cfg.PubKeys
-	}
-
-	backend, err := sandbox.Backend(rootOpts.sandbox)
+	name := lo.Ternary(rootOpts.sandbox != "", rootOpts.sandbox, rootOpts.Config.Sandbox)
+	backend, err := sandbox.Backend(name)
 	if err != nil {
 		return err
 	}
@@ -96,9 +79,9 @@ func rootPreRun(_ *cobra.Command, _ []string) error {
 	case sandbox.BubblewrapSandbox:
 		rootOpts.Sandbox, err = sandbox.NewBubblewrap(&sandbox.BubblewrapOptions{
 			ReadOnlyPaths: append([]string{
-				rootOpts.configp,
-				rootOpts.privKey,
-			}, rootOpts.pubKeys...),
+				rootOpts.config,
+				rootOpts.PrivKey,
+			}, rootOpts.PubKeys...),
 			ReadWritePaths:   nil,
 			Tmpfs:            true,
 			Devtmpfs:         true,

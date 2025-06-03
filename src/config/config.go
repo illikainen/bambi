@@ -6,32 +6,45 @@ import (
 
 	"github.com/illikainen/bambi/src/metadata"
 
+	"dario.cat/mergo"
 	"github.com/BurntSushi/toml"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
-type Root struct {
-	Settings
-	Profiles map[string]Settings
-}
-
-type Settings struct {
+type Config struct {
+	Profile   string `toml:"-"`
 	PrivKey   string
 	PubKeys   []string
+	Sandbox   string
 	Verbosity string
-	URL       string
+	Profiles  map[string]Config `toml:"profile"`
 }
 
-type Config struct {
-	Root
-	Path string
-}
-
-func Read(path string) (*Config, error) {
+func Read(path string, overrides *Config) (*Config, error) {
 	log.Debugf("%s: reading config", path)
 
-	c := &Config{Path: path}
-	_, err := toml.DecodeFile(path, &c.Root)
+	c := &Config{
+		Verbosity: "info",
+	}
+	_, err := toml.DecodeFile(path, &c)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
+	if overrides.Profile != "" {
+		profile, ok := c.Profiles[overrides.Profile]
+		if !ok {
+			return nil, errors.Errorf("invalid profile: %s", overrides.Profile)
+		}
+
+		err = mergo.Merge(c, profile, mergo.WithOverride)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = mergo.Merge(c, overrides, mergo.WithOverride)
 	if err != nil {
 		return nil, err
 	}

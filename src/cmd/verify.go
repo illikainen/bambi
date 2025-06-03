@@ -49,7 +49,7 @@ func verifyPreRun(_ *cobra.Command, _ []string) error {
 func verifyRun(cmd *cobra.Command, _ []string) (err error) {
 	cmd.SilenceUsage = true
 
-	keys, err := blob.ReadKeyring(rootOpts.privKey, rootOpts.pubKeys)
+	keys, err := blob.ReadKeyring(rootOpts.PrivKey, rootOpts.PubKeys)
 	if err != nil {
 		return err
 	}
