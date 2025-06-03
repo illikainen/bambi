@@ -8,42 +8,28 @@ import (
 
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-utils/src/errorx"
-	"github.com/illikainen/go-utils/src/flag"
-	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var sealOpts struct {
-	input      flag.PathSlice
-	output     flag.Path
+	output     string
 	signedOnly bool
 }
 
 var sealCmd = &cobra.Command{
-	Use:   "seal [flags] <file>...",
-	Short: "Encrypt and sign an archive",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := sealRun(cmd, args)
-		if err != nil {
-			log.Tracef("%+v", err)
-			log.Fatalf("%s", err)
-		}
-	},
-	Args: sealArgs,
+	Use:     "seal [flags] <file>...",
+	Short:   "Encrypt and sign an archive",
+	Args:    cobra.MinimumNArgs(1),
+	PreRunE: sealPreRun,
+	RunE:    sealRun,
 }
 
 func init() {
 	flags := sealCmd.Flags()
 
-	sealOpts.input.State = flag.MustExist
-	flags.VarP(&sealOpts.input, "input", "i", "Input file to seal")
-	lo.Must0(flags.MarkHidden("input"))
-
-	sealOpts.output.State = flag.MustNotExist
-	sealOpts.output.Mode = flag.ReadWriteMode
-	flags.VarP(&sealOpts.output, "output", "o", "Output file for the sealed blob")
+	flags.StringVarP(&sealOpts.output, "output", "o", "", "Output file for the sealed blob")
 	lo.Must0(sealCmd.MarkFlagRequired("output"))
 
 	flags.BoolVarP(&sealOpts.signedOnly, "signed-only", "s", false,
@@ -52,30 +38,29 @@ func init() {
 	rootCmd.AddCommand(sealCmd)
 }
 
-func sealArgs(cmd *cobra.Command, args []string) error {
-	if len(args) <= 0 {
-		return errors.Errorf("no files to seal")
-	}
-
-	flags := cmd.Flags()
-	input := flags.Lookup("input")
-	for _, arg := range args {
-		err := input.Value.Set(arg)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func sealRun(_ *cobra.Command, args []string) (err error) {
-	keys, err := blob.ReadKeyring(rootOpts.privKey.String(), rootOpts.pubKeys.StringSlice())
+func sealPreRun(_ *cobra.Command, args []string) error {
+	err := rootOpts.Sandbox.AddReadOnlyPath(args...)
 	if err != nil {
 		return err
 	}
 
-	output, err := os.Create(sealOpts.output.String())
+	err = rootOpts.Sandbox.AddReadWritePath(sealOpts.output)
+	if err != nil {
+		return err
+	}
+
+	return rootOpts.Sandbox.Confine()
+}
+
+func sealRun(cmd *cobra.Command, args []string) (err error) {
+	cmd.SilenceUsage = true
+
+	keys, err := blob.ReadKeyring(rootOpts.privKey, rootOpts.pubKeys)
+	if err != nil {
+		return err
+	}
+
+	output, err := os.Create(sealOpts.output)
 	if err != nil {
 		return err
 	}
@@ -102,6 +87,6 @@ func sealRun(_ *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	log.Infof("successfully wrote sealed blob to %s", sealOpts.output.String())
+	log.Infof("successfully wrote sealed blob to %s", sealOpts.output)
 	return nil
 }

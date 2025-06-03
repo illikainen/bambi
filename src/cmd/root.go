@@ -2,15 +2,15 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
 	"github.com/illikainen/bambi/src/config"
 	"github.com/illikainen/bambi/src/metadata"
-	"github.com/illikainen/bambi/src/sandbox"
 
-	"github.com/illikainen/go-utils/src/flag"
-	"github.com/illikainen/go-utils/src/logging"
+	"github.com/illikainen/go-utils/src/process"
+	"github.com/illikainen/go-utils/src/sandbox"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
@@ -18,12 +18,14 @@ import (
 )
 
 var rootOpts struct {
-	configp   flag.Path
+	configp   string
 	config    *config.Config
 	profile   string
-	verbosity logging.LogLevel
-	privKey   flag.Path
-	pubKeys   flag.PathSlice
+	verbosity string
+	privKey   string
+	pubKeys   []string
+	sandbox   string
+	Sandbox   sandbox.Sandbox
 }
 
 var rootCmd = &cobra.Command{
@@ -51,46 +53,70 @@ func init() {
 		levels = append(levels, level.String())
 	}
 
-	rootOpts.configp.State = flag.MustExist
-	flags.Var(&rootOpts.configp, "config", "Configuration file")
+	flags.StringVarP(&rootOpts.configp, "config", "", lo.Must1(config.ConfigFile()), "Configuration file")
 	flags.StringVarP(&rootOpts.profile, "profile", "p", "", "Profile to use")
-	flags.Var(&rootOpts.verbosity, "verbosity", fmt.Sprintf("Verbosity (%s)", strings.Join(levels, ", ")))
-	flags.Var(&rootOpts.privKey, "privkey", "Private key file")
-	lo.Must0(flags.MarkHidden("privkey"))
-	flags.Var(&rootOpts.pubKeys, "pubkeys", "Public key file(s)")
-	lo.Must0(flags.MarkHidden("pubkeys"))
+	flags.StringVarP(&rootOpts.verbosity, "verbosity", "V", "info",
+		fmt.Sprintf("Verbosity (%s)", strings.Join(levels, ", ")))
+	flags.StringVarP(&rootOpts.privKey, "privkey", "", "", "Private key file")
+	flags.StringSliceVarP(&rootOpts.pubKeys, "pubkeys", "", nil, "Public key file(s)")
+	flags.StringVarP(&rootOpts.sandbox, "sandbox", "", "", "Sandbox backend")
 }
 
-func rootPreRun(cmd *cobra.Command, _ []string) error {
-	cfgPath, err := config.ConfigFile()
+func rootPreRun(_ *cobra.Command, _ []string) error {
+	cfg, err := config.Read(rootOpts.configp)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	rootOpts.config = cfg
+
+	verbosity := rootOpts.verbosity
+	if cfg.Verbosity != "" {
+		verbosity = cfg.Verbosity
+	}
+	level, err := log.ParseLevel(verbosity)
+	if err != nil {
+		return err
+	}
+	log.SetLevel(level)
+
+	if rootOpts.privKey == "" {
+		rootOpts.privKey = cfg.PrivKey
+	}
+
+	if len(rootOpts.pubKeys) == 0 {
+		rootOpts.pubKeys = cfg.PubKeys
+	}
+
+	backend, err := sandbox.Backend(rootOpts.sandbox)
 	if err != nil {
 		return err
 	}
 
-	flags := cmd.Flags()
-	if err := flag.SetFallback(flags, "config", cfgPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-
-	rootOpts.config, err = config.Read(rootOpts.configp.Value)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-
-	if rootOpts.config != nil {
-		cfg := rootOpts.config
-		pcfg := cfg.Profiles[rootOpts.profile]
-
-		if err := flag.SetFallback(flags, "verbosity", pcfg.Verbosity, cfg.Verbosity); err != nil {
+	switch backend {
+	case sandbox.BubblewrapSandbox:
+		rootOpts.Sandbox, err = sandbox.NewBubblewrap(&sandbox.BubblewrapOptions{
+			ReadOnlyPaths: append([]string{
+				rootOpts.configp,
+				rootOpts.privKey,
+			}, rootOpts.pubKeys...),
+			ReadWritePaths:   nil,
+			Tmpfs:            true,
+			Devtmpfs:         true,
+			Procfs:           true,
+			AllowCommonPaths: true,
+			Stdin:            io.Reader(nil),
+			Stdout:           process.LogrusOutput,
+			Stderr:           process.LogrusOutput,
+		})
+		if err != nil {
 			return err
 		}
-		if err := flag.SetFallback(flags, "privkey", pcfg.PrivKey, cfg.PrivKey); err != nil {
-			return err
-		}
-		if err := flag.SetFallback(flags, "pubkeys", pcfg.PubKeys, cfg.PubKeys); err != nil {
+	case sandbox.NoSandbox:
+		rootOpts.Sandbox, err = sandbox.NewNoop()
+		if err != nil {
 			return err
 		}
 	}
 
-	return sandbox.Exec(cmd.CalledAs(), flags)
+	return nil
 }

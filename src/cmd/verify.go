@@ -7,30 +7,28 @@ import (
 	"github.com/illikainen/bambi/src/metadata"
 
 	"github.com/illikainen/go-cryptor/src/blob"
-	"github.com/illikainen/go-utils/src/cobrax"
 	"github.com/illikainen/go-utils/src/errorx"
-	"github.com/illikainen/go-utils/src/flag"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var verifyOpts struct {
-	input      flag.Path
+	input      string
 	signedOnly bool
 }
 
 var verifyCmd = &cobra.Command{
-	Use:   "verify",
-	Short: "Verify a signed and encrypted archive",
-	Run:   cobrax.Run(verifyRun),
+	Use:     "verify",
+	Short:   "Verify a signed and encrypted archive",
+	PreRunE: verifyPreRun,
+	RunE:    verifyRun,
 }
 
 func init() {
 	flags := verifyCmd.Flags()
 
-	verifyOpts.input.State = flag.MustExist
-	flags.VarP(&verifyOpts.input, "input", "i", "File to verify")
+	flags.StringVarP(&verifyOpts.input, "input", "i", "", "File to verify")
 	lo.Must0(verifyCmd.MarkFlagRequired("input"))
 
 	flags.BoolVarP(&verifyOpts.signedOnly, "signed-only", "s", false,
@@ -39,13 +37,24 @@ func init() {
 	rootCmd.AddCommand(verifyCmd)
 }
 
-func verifyRun(_ *cobra.Command, _ []string) (err error) {
-	keys, err := blob.ReadKeyring(rootOpts.privKey.String(), rootOpts.pubKeys.StringSlice())
+func verifyPreRun(_ *cobra.Command, _ []string) error {
+	err := rootOpts.Sandbox.AddReadOnlyPath(verifyOpts.input)
 	if err != nil {
 		return err
 	}
 
-	inf, err := os.Open(verifyOpts.input.String())
+	return rootOpts.Sandbox.Confine()
+}
+
+func verifyRun(cmd *cobra.Command, _ []string) (err error) {
+	cmd.SilenceUsage = true
+
+	keys, err := blob.ReadKeyring(rootOpts.privKey, rootOpts.pubKeys)
+	if err != nil {
+		return err
+	}
+
+	inf, err := os.Open(verifyOpts.input)
 	if err != nil {
 		return err
 	}
@@ -70,6 +79,6 @@ func verifyRun(_ *cobra.Command, _ []string) (err error) {
 	log.Infof("sha2-256: %s", blobber.Metadata.Hashes.SHA256)
 	log.Infof("sha3-512: %s", blobber.Metadata.Hashes.KECCAK512)
 	log.Infof("blake2b-512: %s", blobber.Metadata.Hashes.BLAKE2b512)
-	log.Infof("successfully verified %s", verifyOpts.input.String())
+	log.Infof("successfully verified %s", verifyOpts.input)
 	return nil
 }

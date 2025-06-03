@@ -8,40 +8,31 @@ import (
 
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-utils/src/errorx"
-	"github.com/illikainen/go-utils/src/flag"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var unsealOpts struct {
-	input      flag.Path
-	output     flag.Path
+	input      string
+	output     string
 	signedOnly bool
 }
 
 var unsealCmd = &cobra.Command{
-	Use:   "unseal",
-	Short: "Verify and decrypt an archive",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := unsealRun(cmd, args)
-		if err != nil {
-			log.Tracef("%+v", err)
-			log.Fatalf("%s", err)
-		}
-	},
+	Use:     "unseal",
+	Short:   "Verify and decrypt an archive",
+	PreRunE: unsealPreRun,
+	RunE:    unsealRun,
 }
 
 func init() {
 	flags := unsealCmd.Flags()
 
-	unsealOpts.input.State = flag.MustExist
-	flags.VarP(&unsealOpts.input, "input", "i", "File to unseal")
+	flags.StringVarP(&unsealOpts.input, "input", "i", "", "File to unseal")
 	lo.Must0(unsealCmd.MarkFlagRequired("input"))
 
-	unsealOpts.output.State = flag.MustBeDir
-	unsealOpts.output.Mode = flag.ReadWriteMode
-	flags.VarP(&unsealOpts.output, "output", "o", "Output file for the unsealed blob")
+	flags.StringVarP(&unsealOpts.output, "output", "o", "", "Output file for the unsealed blob")
 	lo.Must0(unsealCmd.MarkFlagRequired("output"))
 
 	flags.BoolVarP(&unsealOpts.signedOnly, "signed-only", "s", false,
@@ -50,13 +41,29 @@ func init() {
 	rootCmd.AddCommand(unsealCmd)
 }
 
-func unsealRun(_ *cobra.Command, _ []string) (err error) {
-	keys, err := blob.ReadKeyring(rootOpts.privKey.String(), rootOpts.pubKeys.StringSlice())
+func unsealPreRun(_ *cobra.Command, _ []string) error {
+	err := rootOpts.Sandbox.AddReadOnlyPath(unsealOpts.input)
 	if err != nil {
 		return err
 	}
 
-	f, err := os.Open(unsealOpts.input.String())
+	err = rootOpts.Sandbox.AddReadWritePath(unsealOpts.output)
+	if err != nil {
+		return err
+	}
+
+	return rootOpts.Sandbox.Confine()
+}
+
+func unsealRun(cmd *cobra.Command, _ []string) (err error) {
+	cmd.SilenceUsage = true
+
+	keys, err := blob.ReadKeyring(rootOpts.privKey, rootOpts.pubKeys)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(unsealOpts.input)
 	if err != nil {
 		return err
 	}
@@ -81,12 +88,12 @@ func unsealRun(_ *cobra.Command, _ []string) (err error) {
 	}
 	defer errorx.Defer(arch.Close, &err)
 
-	err = arch.ExtractAll(unsealOpts.output.String())
+	err = arch.ExtractAll(unsealOpts.output)
 	if err != nil {
 		return err
 	}
 
-	log.Infof("successfully wrote unsealed blob to %s", unsealOpts.output.String())
+	log.Infof("successfully wrote unsealed blob to %s", unsealOpts.output)
 
 	return nil
 }
