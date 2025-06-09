@@ -5,4 +5,4 @@
 #
 # Run `make pin` to update this file.
 b2123ed3bf0b6c07f5f96e4888f0ba0fe3219e8013b98f132c6bc9e46b356ed6  go.sum
-37c806fcaeb4465a6a4565de35e0901474a26757a637a021079b3db650e0bb27  go.mod
+5e9ba9e5d8f26b4ca3431d13c433be33bec67b394899f7b5ed529c197a5b594d  go.mod
