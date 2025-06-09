@@ -4,5 +4,5 @@
 # module checksum).
 #
 # Run `make pin` to update this file.
-c94cae1526c0f02dc50e446ae3ef27c410a46266af47938501969ab8fdcbbfef  go.sum
-2ae5eeef810456580adf84b1efd3cd3208a3c0399aedee26c0d3550a73665c30  go.mod
+b2123ed3bf0b6c07f5f96e4888f0ba0fe3219e8013b98f132c6bc9e46b356ed6  go.sum
+37c806fcaeb4465a6a4565de35e0901474a26757a637a021079b3db650e0bb27  go.mod

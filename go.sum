@@ -12,8 +12,8 @@ github.com/illikainen/go-cryptor v0.0.0-20250505122540-fd5a2321b8f5 h1:p1BzIYtKz
 github.com/illikainen/go-cryptor v0.0.0-20250505122540-fd5a2321b8f5/go.mod h1:cpgQejcGiXb2WmL7dLT419cp29kCu3xN1TzqxXDT7Ds=
 github.com/illikainen/go-netutils v0.0.0-20250505122326-0e2700986716 h1:6b+oJ2F+IFO3tuhLrTbjT0Vicp/u+q7fcqRyo3ssoEI=
 github.com/illikainen/go-netutils v0.0.0-20250505122326-0e2700986716/go.mod h1:NC/Hlw20lMczESnDDW7JNyDuA3GPSimTrVFE76r0E8c=
-github.com/illikainen/go-utils v0.0.0-20250603184054-e6bcd2510926 h1:QAm0Zw6ZGyOt8JkvOgfqlVt/2uIYN7ynwjtig/g3Ht8=
-github.com/illikainen/go-utils v0.0.0-20250603184054-e6bcd2510926/go.mod h1:0J5L4uLRF4UGr1swIf9RNZjdrlh372Kt4B8yverY8UQ=
+github.com/illikainen/go-utils v0.0.0-20250609153058-d4566b4ba778 h1:C/jFWfNfulWQUpgW6k9h1fo3lduAUjw55Qtl0pY82MU=
+github.com/illikainen/go-utils v0.0.0-20250609153058-d4566b4ba778/go.mod h1:0J5L4uLRF4UGr1swIf9RNZjdrlh372Kt4B8yverY8UQ=
 github.com/inconshreveable/mousetrap v1.0.1 h1:U3uMjPSQEBMNp1lFxmllqCPM6P5u/Xq7Pgzkat/bFNc=
 github.com/inconshreveable/mousetrap v1.0.1/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/kevinburke/ssh_config v1.2.0 h1:x584FjTGwHzMwvHx18PXxbBVzfnxogHaAReU4gf13a4=
