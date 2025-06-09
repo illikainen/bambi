@@ -1,0 +1,53 @@
+---
+image: debian:12
+
+variables:
+  GIT_DEPTH: 0
+
+stages:
+  - build
+  - test
+
+before_script:
+  # Prepare packages
+  - apt-get update
+  - apt-get -y dist-upgrade
+  - apt-get -y install ca-certificates git golang make
+  # Configure signing key
+  - echo 'dev-personal-git@iodine ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOaK5/rx1e5OSInMYOwoLeGyIwi7Hpao0qUC4oyO0/Wr' >"${HOME}/.signers"
+  # Verify repo and checkout the correct ref
+  - git -c gpg.ssh.allowedSignersFile="${HOME}/.signers" verify-commit HEAD
+  - git checkout -B "$CI_COMMIT_REF_NAME"
+  - git -c gpg.ssh.allowedSignersFile="${HOME}/.signers" verify-commit HEAD
+  # Clone, verify and build gofer
+  - oldwd="$(pwd)"
+  - git clone https://github.com/illikainen/gofer "${HOME}/gofer"
+  - cd "${HOME}/gofer"
+  - git -c gpg.ssh.allowedSignersFile="${HOME}/.signers" verify-commit HEAD
+  - make tidy
+  - make verify
+  - make
+  - mv build/gofer-linux-amd64 /usr/local/bin/gofer
+  - cd "$oldwd"
+
+build-job:
+  stage: build
+  script:
+    - make tidy
+    - make verify
+    - make
+    - make release
+    - find build ! -type d ! -name SHA256SUMS -exec sha256sum --tag '{}' \; >build/SHA256SUMS
+    - cat build/SHA256SUMS |sort
+  artifacts:
+    paths:
+      - ./build
+    expire_in: 1 week
+
+test-job:
+  stage: test
+  script:
+    - make tidy
+    - make
+    - make check
+    - make test
