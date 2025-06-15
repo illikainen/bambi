@@ -8,7 +8,7 @@ import (
 
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-utils/src/errorx"
-	"github.com/samber/lo"
+	"github.com/illikainen/go-utils/src/fn"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -30,10 +30,10 @@ func init() {
 	flags := unsealCmd.Flags()
 
 	flags.StringVarP(&unsealOpts.input, "input", "i", "", "File to unseal")
-	lo.Must0(unsealCmd.MarkFlagRequired("input"))
+	fn.Must(unsealCmd.MarkFlagRequired("input"))
 
 	flags.StringVarP(&unsealOpts.output, "output", "o", "", "Output file for the unsealed blob")
-	lo.Must0(unsealCmd.MarkFlagRequired("output"))
+	fn.Must(unsealCmd.MarkFlagRequired("output"))
 
 	flags.BoolVarP(&unsealOpts.signedOnly, "signed-only", "s", false,
 		"Required if the archive is signed but not encrypted")

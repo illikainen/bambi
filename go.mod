@@ -6,12 +6,11 @@ require (
 	dario.cat/mergo v1.0.1
 	github.com/BurntSushi/toml v1.3.2
 	github.com/fatih/color v1.15.0
-	github.com/illikainen/go-cryptor v0.0.0-20250505122540-fd5a2321b8f5
-	github.com/illikainen/go-netutils v0.0.0-20250505122326-0e2700986716
-	github.com/illikainen/go-utils v0.0.0-20250609153058-d4566b4ba778
+	github.com/illikainen/go-cryptor v0.0.0-20250615151418-48d21396530a
+	github.com/illikainen/go-netutils v0.0.0-20250615150800-4d7276f21c57
+	github.com/illikainen/go-utils v0.0.0-20250615145810-04ff8920a231
 	github.com/mattn/go-isatty v0.0.17
 	github.com/pkg/errors v0.9.1
-	github.com/samber/lo v1.37.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 )

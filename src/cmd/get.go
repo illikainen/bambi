@@ -9,7 +9,7 @@ import (
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-netutils/src/sshx"
 	"github.com/illikainen/go-utils/src/errorx"
-	"github.com/samber/lo"
+	"github.com/illikainen/go-utils/src/fn"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -32,7 +32,7 @@ func init() {
 	flags := getCmd.Flags()
 
 	flags.StringVarP(&getOpts.output, "output", "o", "", "Output file for the downloaded archive")
-	lo.Must0(getCmd.MarkFlagRequired("output"))
+	fn.Must(getCmd.MarkFlagRequired("output"))
 
 	flags.BoolVarP(&getOpts.signedOnly, "signed-only", "s", false,
 		"Required if the archive is signed but not encrypted")

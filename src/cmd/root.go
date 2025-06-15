@@ -8,9 +8,9 @@ import (
 	"github.com/illikainen/bambi/src/config"
 	"github.com/illikainen/bambi/src/metadata"
 
+	"github.com/illikainen/go-utils/src/fn"
 	"github.com/illikainen/go-utils/src/process"
 	"github.com/illikainen/go-utils/src/sandbox"
-	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -47,7 +47,7 @@ func init() {
 		levels = append(levels, level.String())
 	}
 
-	flags.StringVarP(&rootOpts.config, "config", "", lo.Must1(config.ConfigFile()), "Configuration file")
+	flags.StringVarP(&rootOpts.config, "config", "", fn.Must1(config.ConfigFile()), "Configuration file")
 	flags.StringVarP(&rootOpts.Profile, "profile", "p", "", "Profile to use")
 	flags.StringVarP(&rootOpts.Verbosity, "verbosity", "V", "",
 		fmt.Sprintf("Verbosity (%s)", strings.Join(levels, ", ")))
@@ -69,7 +69,7 @@ func rootPreRun(_ *cobra.Command, _ []string) error {
 	}
 	log.SetLevel(level)
 
-	name := lo.Ternary(rootOpts.sandbox != "", rootOpts.sandbox, rootOpts.Config.Sandbox)
+	name := fn.Ternary(rootOpts.sandbox != "", rootOpts.sandbox, rootOpts.Config.Sandbox)
 	backend, err := sandbox.Backend(name)
 	if err != nil {
 		return err

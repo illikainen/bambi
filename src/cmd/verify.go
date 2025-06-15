@@ -8,7 +8,7 @@ import (
 
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-utils/src/errorx"
-	"github.com/samber/lo"
+	"github.com/illikainen/go-utils/src/fn"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -29,7 +29,7 @@ func init() {
 	flags := verifyCmd.Flags()
 
 	flags.StringVarP(&verifyOpts.input, "input", "i", "", "File to verify")
-	lo.Must0(verifyCmd.MarkFlagRequired("input"))
+	fn.Must(verifyCmd.MarkFlagRequired("input"))
 
 	flags.BoolVarP(&verifyOpts.signedOnly, "signed-only", "s", false,
 		"Required if the archive is signed but not encrypted")

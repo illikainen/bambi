@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"github.com/illikainen/go-cryptor/src/asymmetric"
-	"github.com/samber/lo"
+	"github.com/illikainen/go-utils/src/fn"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +23,7 @@ func init() {
 	flags := fingerprintCmd.Flags()
 
 	flags.StringVarP(&fingerprintOpts.input, "input", "i", "", "Key to fingerprint")
-	lo.Must0(fingerprintCmd.MarkFlagRequired("input"))
+	fn.Must(fingerprintCmd.MarkFlagRequired("input"))
 
 	flags.BoolVarP(&fingerprintOpts.private, "private", "P", false, "Treat the key as a private key")
 

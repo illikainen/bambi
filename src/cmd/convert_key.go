@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"github.com/illikainen/go-cryptor/src/asymmetric"
-	"github.com/samber/lo"
+	"github.com/illikainen/go-utils/src/fn"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -25,10 +25,10 @@ func init() {
 	flags := convertKeyCmd.Flags()
 
 	flags.StringVarP(&convertKeyOpts.input, "input", "i", "", "Key to fingerprint")
-	lo.Must0(convertKeyCmd.MarkFlagRequired("input"))
+	fn.Must(convertKeyCmd.MarkFlagRequired("input"))
 
 	flags.StringVarP(&convertKeyOpts.output, "output", "o", "", "Output file for the converted key")
-	lo.Must0(convertKeyCmd.MarkFlagRequired("output"))
+	fn.Must(convertKeyCmd.MarkFlagRequired("output"))
 
 	flags.BoolVarP(&convertKeyOpts.private, "private", "P", false, "Treat the key as a private key")
 

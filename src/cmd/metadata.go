@@ -8,8 +8,8 @@ import (
 
 	"github.com/illikainen/go-cryptor/src/blob"
 	"github.com/illikainen/go-utils/src/errorx"
+	"github.com/illikainen/go-utils/src/fn"
 	"github.com/pkg/errors"
-	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -32,7 +32,7 @@ func init() {
 	flags := metadataCmd.Flags()
 
 	flags.StringVarP(&metadataOpts.input, "input", "i", "", "File to verify")
-	lo.Must0(metadataCmd.MarkFlagRequired("input"))
+	fn.Must(metadataCmd.MarkFlagRequired("input"))
 
 	flags.StringVarP(&metadataOpts.output, "output", "o", "", "Output file for the verified blob")
 

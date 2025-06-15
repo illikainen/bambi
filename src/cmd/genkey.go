@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/illikainen/go-cryptor/src/asymmetric"
-	"github.com/samber/lo"
+	"github.com/illikainen/go-utils/src/fn"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +26,7 @@ func init() {
 
 	flags.StringVarP(&genkeyOpts.output, "output", "o", "",
 		"Write the generated keypair to <output>.pub and <output>.priv")
-	lo.Must0(genkeyCmd.MarkFlagRequired("output"))
+	fn.Must(genkeyCmd.MarkFlagRequired("output"))
 
 	flags.DurationVarP(&genkeyOpts.delay, "delay", "d", 60*time.Second,
 		"Add a delay between each generated key")
