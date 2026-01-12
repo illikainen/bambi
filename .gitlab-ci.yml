@@ -1,53 +1,61 @@
 ---
 image: debian:12
 
+workflow:
+  rules:
+    - if: '$CI_COMMIT_MESSAGE =~ /(skip-ci|skip-gitlab)/i'
+      when: never
+    - when: always
+
 variables:
   GIT_DEPTH: 0
+  LC_ALL: "C"
+  TZ: "UTC"
 
 stages:
   - build
-  - test
 
 before_script:
   # Prepare packages
   - apt-get update
   - apt-get -y dist-upgrade
-  - apt-get -y install ca-certificates git golang make
+  - apt-get -y install ca-certificates git golang make openssl
   # Configure signing key
   - echo 'dev-personal-git@iodine ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOaK5/rx1e5OSInMYOwoLeGyIwi7Hpao0qUC4oyO0/Wr' >"${HOME}/.signers"
   # Verify repo and checkout the correct ref
   - git -c gpg.ssh.allowedSignersFile="${HOME}/.signers" verify-commit HEAD
   - git checkout -B "$CI_COMMIT_REF_NAME"
   - git -c gpg.ssh.allowedSignersFile="${HOME}/.signers" verify-commit HEAD
-  # Clone, verify and build gofer
-  - oldwd="$(pwd)"
-  - git clone https://github.com/illikainen/gofer "${HOME}/gofer"
-  - cd "${HOME}/gofer"
-  - git -c gpg.ssh.allowedSignersFile="${HOME}/.signers" verify-commit HEAD
-  - make tidy
-  - make verify
-  - make
-  - mv build/gofer-linux-amd64 /usr/local/bin/gofer
-  - cd "$oldwd"
 
 build-job:
   stage: build
   script:
-    - make tidy
-    - make verify
-    - make
-    - make release
-    - find build ! -type d ! -name SHA256SUMS -exec sha256sum --tag '{}' \; >build/SHA256SUMS
-    - cat build/SHA256SUMS |sort
+    # Prepare dependencies
+    - go mod tidy
+    - go mod verify
+    - git diff go.mod go.sum
+    - sha256sum --strict --check go.pin
+    - go env -w GOPROXY="off" CGO_ENABLED="0"
+    # Regular build
+    - go generate ./...
+    - go build -mod=readonly -trimpath -o "build/${CI_PROJECT_NAME}"
+    # Release build
+    - GOFER_RELEASE=true go generate ./...
+    - GOOS=linux GOARCH=amd64 go build -o "build/release/${CI_PROJECT_NAME}-linux-amd64"
+        -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
+    - GOOS=linux GOARCH=arm64 go build -o "build/release/${CI_PROJECT_NAME}-linux-arm64"
+        -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
+    - GOOS=darwin GOARCH=arm64 go build -o "build/release/${CI_PROJECT_NAME}-darwin-arm64"
+        -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
+    - GOOS=windows GOARCH=amd64 go build -o "build/release/${CI_PROJECT_NAME}-windows-amd64"
+        -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
+    # Checksums
+    - find build ! -type d -exec sha256sum --tag '{}' \; >SHA256SUMS
+    - cat SHA256SUMS |sort
+    - find build ! -type d -exec openssl blake2s256 '{}' \; >BLAKE256SUMS
+    - cat BLAKE256SUMS |sort
+    - mv SHA256SUMS BLAKE256SUMS build/
   artifacts:
     paths:
       - ./build
     expire_in: 1 week
-
-test-job:
-  stage: test
-  script:
-    - make tidy
-    - make
-    - make check
-    - make test

@@ -3,7 +3,8 @@ name: Pipeline
 on: [push, pull_request]
 
 jobs:
-  pipeline:
+  build:
+    if: "!contains(github.event.head_commit.message, 'skip-ci') && !contains(github.event.head_commit.message, 'skip-github')"
     runs-on: ubuntu-latest
     container:
       image: debian:12
@@ -12,7 +13,72 @@ jobs:
         run: |
           echo 'dev-personal-git@iodine ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOaK5/rx1e5OSInMYOwoLeGyIwi7Hpao0qUC4oyO0/Wr' >"${HOME}/.signers"
 
-      - name: Prepare packages
+      - name: Install packages
+        run: |
+          apt-get update
+          apt-get -y dist-upgrade
+          apt-get -y install ca-certificates git golang openssl
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify
+        run: |
+          chown -R root:root .
+          git -c gpg.ssh.allowedSignersFile="${HOME}/.signers" verify-commit HEAD
+
+      - name: Prepare dependencies
+        run: |
+          go mod tidy
+          go mod verify
+          git diff go.mod go.sum
+          sha256sum --strict --check go.pin
+
+      - name: Regular build
+        run: |
+          go env -w GOPROXY="off" CGO_ENABLED="0"
+          go generate ./...
+          go build -mod=readonly -trimpath -o "build/${GITHUB_REPOSITORY##*/}"
+
+      - name: Release build
+        run: |
+          go env -w GOPROXY="off" CGO_ENABLED="0"
+          GOFER_RELEASE=true go generate ./...
+          GOOS=linux GOARCH=amd64 go build -o "build/release/${GITHUB_REPOSITORY##*/}-linux-amd64" \
+            -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
+          GOOS=linux GOARCH=arm64 go build -o "build/release/${GITHUB_REPOSITORY##*/}-linux-arm64" \
+            -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
+          GOOS=darwin GOARCH=arm64 go build -o "build/release/${GITHUB_REPOSITORY##*/}-darwin-arm64" \
+            -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
+          GOOS=windows GOARCH=amd64 go build -o "build/release/${GITHUB_REPOSITORY##*/}-windows-amd64" \
+            -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
+
+      - name: Checksums
+        run: |
+          find build ! -type d -exec sha256sum --tag '{}' \; >SHA256SUMS
+          cat SHA256SUMS |sort
+          find build ! -type d -exec openssl blake2s256 '{}' \; >BLAKE256SUMS
+          cat BLAKE256SUMS |sort
+          mv SHA256SUMS BLAKE256SUMS build/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./build
+
+  test:
+    if: "!contains(github.event.head_commit.message, 'skip-ci') && !contains(github.event.head_commit.message, 'skip-github')"
+    runs-on: ubuntu-latest
+    container:
+      image: debian:12
+    steps:
+      - name: Prepare signing key
+        run: |
+          echo 'dev-personal-git@iodine ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOaK5/rx1e5OSInMYOwoLeGyIwi7Hpao0qUC4oyO0/Wr' >"${HOME}/.signers"
+
+      - name: Install packages
         run: |
           apt-get update
           apt-get -y dist-upgrade
@@ -35,28 +101,20 @@ jobs:
           cp build/gofer-linux-amd64 /usr/local/bin/gofer
         working-directory: gofer
 
-      - name: Checkout ourself
+      - name: Checkout this repo
         uses: actions/checkout@v4
         with:
           path: this
           fetch-depth: 0
 
-      - name: Build ourself
+      - name: Build this repo
         run: |
           chown -R root:root .
           git -c gpg.ssh.allowedSignersFile="${HOME}/.signers" verify-commit HEAD
           make tidy
           make verify
           make
-          make release
-          find build ! -type d ! -name SHA256SUMS -exec sha256sum --tag '{}' \; >build/SHA256SUMS
-          cat build/SHA256SUMS |sort
         working-directory: this
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          path: ./this/build
 
       - name: Test
         run: |
