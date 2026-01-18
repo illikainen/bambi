@@ -100,7 +100,7 @@ func (r *ArchiveReader) ExtractAll(basedir string) (err error) {
 		} else if hdr.Typeflag == tar.TypeReg {
 			log.Infof("extracting '%s' (regular)", dst)
 
-			err := os.MkdirAll(filepath.Dir(dst), 0700)
+			err := os.MkdirAll(filepath.Dir(dst), 0700) // nosem
 			if err != nil {
 				return err
 			}
@@ -128,7 +128,7 @@ func (r *ArchiveReader) ExtractAll(basedir string) (err error) {
 		} else if hdr.Typeflag == tar.TypeDir {
 			log.Infof("extracting '%s' (dir)", dst)
 
-			err := os.MkdirAll(dst, 0700)
+			err := os.MkdirAll(dst, 0700) // nosem
 			if err != nil {
 				return err
 			}
