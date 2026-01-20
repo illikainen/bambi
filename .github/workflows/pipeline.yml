@@ -1,137 +1,34 @@
+---
 name: Pipeline
 
-on: [push, pull_request]
+on: [push, pull_request]  # yamllint disable-line rule:truthy
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    if: "!contains(github.event.head_commit.message, 'skip-ci') && !contains(github.event.head_commit.message, 'skip-github')"
-    runs-on: ubuntu-latest
-    container:
-      image: debian:12
-    steps:
-      - name: Prepare signing key
-        run: |
-          echo 'dev-personal-git@iodine ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOaK5/rx1e5OSInMYOwoLeGyIwi7Hpao0qUC4oyO0/Wr' >"${HOME}/.signers"
+  pathcheck:
+    uses: illikainen/cicd/.github/workflows/pathcheck.yml@master
+    secrets: inherit
 
-      - name: Install packages
-        run: |
-          apt-get update
-          apt-get -y dist-upgrade
-          apt-get -y install ca-certificates git golang openssl
-
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Verify
-        run: |
-          chown -R root:root .
-          git -c gpg.ssh.allowedSignersFile="${HOME}/.signers" verify-commit HEAD
-
-      - name: Prepare dependencies
-        run: |
-          go mod tidy
-          go mod verify
-          git diff go.mod go.sum
-          sha256sum --strict --check go.pin
-
-      - name: Regular build
-        run: |
-          go env -w GOPROXY="off" CGO_ENABLED="0"
-          go generate ./...
-          go build -mod=readonly -trimpath -o "build/${GITHUB_REPOSITORY##*/}"
-
-      - name: Release build
-        run: |
-          go env -w GOPROXY="off" CGO_ENABLED="0"
-          GOFER_RELEASE=true go generate ./...
-          GOOS=linux GOARCH=amd64 go build -o "build/release/${GITHUB_REPOSITORY##*/}-linux-amd64" \
-            -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
-          GOOS=linux GOARCH=arm64 go build -o "build/release/${GITHUB_REPOSITORY##*/}-linux-arm64" \
-            -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
-          GOOS=darwin GOARCH=arm64 go build -o "build/release/${GITHUB_REPOSITORY##*/}-darwin-arm64" \
-            -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
-          GOOS=windows GOARCH=amd64 go build -o "build/release/${GITHUB_REPOSITORY##*/}-windows-amd64" \
-            -mod=readonly -trimpath -buildmode=pie -ldflags="-s -w -buildid="
-
-      - name: Checksums
-        run: |
-          find build ! -type d -exec sha256sum --tag '{}' \; >SHA256SUMS
-          cat SHA256SUMS |sort
-          find build ! -type d -exec openssl blake2s256 '{}' \; >BLAKE256SUMS
-          cat BLAKE256SUMS |sort
-          mv SHA256SUMS BLAKE256SUMS build/
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          path: ./build
-
-  test:
-    if: "!contains(github.event.head_commit.message, 'skip-ci') && !contains(github.event.head_commit.message, 'skip-github')"
-    runs-on: ubuntu-latest
-    container:
-      image: debian:12
-    steps:
-      - name: Prepare signing key
-        run: |
-          echo 'dev-personal-git@iodine ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOaK5/rx1e5OSInMYOwoLeGyIwi7Hpao0qUC4oyO0/Wr' >"${HOME}/.signers"
-
-      - name: Install packages
-        run: |
-          apt-get update
-          apt-get -y dist-upgrade
-          apt-get -y install ca-certificates git golang make
-
-      - name: Checkout gofer
-        uses: actions/checkout@v4
-        with:
-          path: gofer
-          repository: illikainen/gofer
-          fetch-depth: 0
-
-      - name: Build gofer
-        run: |
-          chown -R root:root .
-          git -c gpg.ssh.allowedSignersFile="${HOME}/.signers" verify-commit HEAD
-          make tidy
-          make verify
-          make
-          cp build/gofer-linux-amd64 /usr/local/bin/gofer
-        working-directory: gofer
-
-      - name: Checkout this repo
-        uses: actions/checkout@v4
-        with:
-          path: this
-          fetch-depth: 0
-
-      - name: Build this repo
-        run: |
-          chown -R root:root .
-          git -c gpg.ssh.allowedSignersFile="${HOME}/.signers" verify-commit HEAD
-          make tidy
-          make verify
-          make
-        working-directory: this
-
-      - name: Test
-        run: |
-          make check
-          make test
-        working-directory: this
+  go:
+    uses: illikainen/cicd/.github/workflows/go.yml@master
+    with:
+      targets: >-
+        linux:amd64
+        linux:arm64
+        darwin:arm64
+        windows:amd64
+    secrets: inherit
 
   govulncheck:
     uses: illikainen/cicd/.github/workflows/govulncheck.yml@master
-    with:
-      pubkeys: >-
-        dev-personal-git@iodine:ssh-ed25519:AAAAC3NzaC1lZDI1NTE5AAAAIOaK5/rx1e5OSInMYOwoLeGyIwi7Hpao0qUC4oyO0/Wr
     secrets: inherit
 
   semgrep:
     uses: illikainen/cicd/.github/workflows/semgrep.yml@master
-    with:
-      pubkeys: >-
-        dev-personal-git@iodine:ssh-ed25519:AAAAC3NzaC1lZDI1NTE5AAAAIOaK5/rx1e5OSInMYOwoLeGyIwi7Hpao0qUC4oyO0/Wr
+    secrets: inherit
+
+  yamllint:
+    uses: illikainen/cicd/.github/workflows/yamllint.yml@master
     secrets: inherit
