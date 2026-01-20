@@ -25,6 +25,10 @@ jobs:
     uses: illikainen/cicd/.github/workflows/govulncheck.yml@master
     secrets: inherit
 
+  golangci-lint:
+    uses: illikainen/cicd/.github/workflows/golangci-lint.yml@dev
+    secrets: inherit
+
   semgrep:
     uses: illikainen/cicd/.github/workflows/semgrep.yml@master
     secrets: inherit
